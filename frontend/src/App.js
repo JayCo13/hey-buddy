@@ -2,10 +2,14 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import { initializeDatabase } from './db/database';
 import { register } from './utils/serviceWorkerRegistration';
-import NotesManager from './components/NotesManager';
+import SplashScreen from './components/SplashScreen';
+import IntroPages from './components/IntroPages';
+import AppNavigator from './components/AppNavigator';
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const [showIntro, setShowIntro] = useState(false);
   const [userId] = useState('1'); // Mock user ID for demo
 
   useEffect(() => {
@@ -26,33 +30,38 @@ function App() {
         console.log('Service worker update available:', registration);
       }
     });
+
+    // Show splash screen for 5 seconds, then intro
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+      setShowIntro(true);
+    }, 7000);
+
+    return () => clearTimeout(splashTimer);
   }, []);
+
+  // Show splash screen
+  if (showSplash) {
+    return <SplashScreen />;
+  }
+
+  // Show intro pages
+  if (showIntro) {
+    return <IntroPages onComplete={() => setShowIntro(false)} />;
+  }
 
   if (!dbReady) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center text-white">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Initializing database...</p>
+          <p className="text-gray-300">Initializing database...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="App">
-      <header className="bg-blue-600 text-white p-4">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold">Hey Buddy</h1>
-          <p className="text-blue-100">AI-Powered Productivity App</p>
-        </div>
-      </header>
-      
-      <main className="min-h-screen bg-gray-50">
-        <NotesManager userId={userId} />
-      </main>
-    </div>
-  );
+  return <AppNavigator />;
 }
 
 export default App;
