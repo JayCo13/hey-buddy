@@ -15,7 +15,8 @@ const MainScreen = ({ onNavigate }) => {
     isListening,
     audioLevel,
     error,
-    isInitialized
+    isInitialized,
+    showLoading
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -38,6 +39,14 @@ const MainScreen = ({ onNavigate }) => {
     }
   };
 
+  // Test function to simulate wake word detection
+  const testWakeWord = () => {
+    console.log('Testing wake word detection...');
+    window.dispatchEvent(new CustomEvent('wakeWordDetected', {
+      detail: { wakeWord: 'hey buddy', transcription: 'hey buddy test' }
+    }));
+  };
+
   const generateWaveform = () => {
     return Array.from({ length: 8 }, (_, i) => (
       <div
@@ -52,11 +61,12 @@ const MainScreen = ({ onNavigate }) => {
   };
 
   if (showProfile) {
-    return <ProfileScreen onBack={() => setShowProfile(false)} />;
+    return <ProfileScreen onBack={() => setShowProfile(false)} onNavigate={onNavigate} />;
   }
 
   return (
     <div className="min-h-screen bg-black text-white">
+
       {/* Status Bar */}
       <div className="flex justify-between items-center px-6 py-2 text-sm">
         <span className="font-medium">9:41</span>
@@ -103,6 +113,14 @@ const MainScreen = ({ onNavigate }) => {
         <p className="text-xl font-bold text-gray-300">
           Let's see what can I do for you?
         </p>
+        
+        {/* Test Button for Wake Word */}
+        <button 
+          onClick={testWakeWord}
+          className="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          Test Voice Command
+        </button>
       </div>
 
       {/* Feature Cards */}
@@ -265,6 +283,16 @@ const MainScreen = ({ onNavigate }) => {
           ))}
         </div>
       </div>
+      
+      {/* Voice Activation Loading Overlay */}
+      {showLoading && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white text-lg font-medium">Listening...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

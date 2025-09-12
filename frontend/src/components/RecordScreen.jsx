@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Signal, Wifi, Battery, Mic, Play, Pause, Home, User } from 'lucide-react';
+import { Signal, Wifi, Mic, Play, Pause, Home, User } from 'lucide-react';
 
 const RecordScreen = ({ onNavigate }) => {
   const [isRecording, setIsRecording] = useState(false);

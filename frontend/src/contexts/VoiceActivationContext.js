@@ -20,6 +20,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
   
   const audioChunksRef = useRef([]);
   const mediaRecorderRef = useRef(null);
@@ -94,14 +95,16 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('Wake word detected:', wakeWord, transcription);
     setWakeWordDetected(true);
     setIsProcessing(true);
+    setShowLoading(true);
     
     // Navigate to record screen
     if (onNavigateToRecord) {
       onNavigateToRecord();
     }
     
-    // Reset after a short delay
+    // Hide loading after 2 seconds and reset states
     setTimeout(() => {
+      setShowLoading(false);
       setWakeWordDetected(false);
       setIsProcessing(false);
     }, 2000);
@@ -195,6 +198,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     error,
     isInitialized,
     wakeWordDetected,
+    showLoading,
     
     // Actions
     startListening,

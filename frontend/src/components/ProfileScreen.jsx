@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Signal, Wifi, Battery, ArrowLeft, Edit3, Mail, Phone, Calendar, Home, Mic, User } from 'lucide-react';
 
 const ProfileScreen = ({ onBack, onNavigate }) => {
@@ -10,6 +11,9 @@ const ProfileScreen = ({ onBack, onNavigate }) => {
   });
 
   const [activeTab, setActiveTab] = useState('profile');
+  
+  // Voice activation context
+  const { showLoading } = useVoiceActivation();
 
   const handleInputChange = (field, value) => {
     setProfileData(prev => ({
@@ -35,6 +39,7 @@ const ProfileScreen = ({ onBack, onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
+
       {/* Galaxy Animation Background */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Subtle gradient overlay */}
@@ -205,6 +210,16 @@ const ProfileScreen = ({ onBack, onNavigate }) => {
           ))}
         </div>
       </div>
+      
+      {/* Voice Activation Loading Overlay */}
+      {showLoading && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-white text-lg font-medium">Listening...</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
