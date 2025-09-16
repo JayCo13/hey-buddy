@@ -187,7 +187,7 @@ const IntroPages = ({ onComplete }) => {
     },
     {
       id: "no-internet",
-      title: "No internet connection?",
+      title: "Internet Down? \nYour AI's Still Up.",
       subtitle: "Works completely offline with no data required",
       description: "Experience seamless AI assistance without relying on internet connectivity. Your AI companion works entirely on your device.",
       icon: "cloud-check",
@@ -361,7 +361,7 @@ const IntroPages = ({ onComplete }) => {
           {/* Title Section - Top */}
           <div className="w-full text-center mb-6">
             {/* Main Title */}
-            <h1 className="text-3xl sm:text-3xl ">
+            <h1 className="text-3xl sm:text-3xl whitespace-pre-line">
               <GradientText
                 colors={["#ffff", "#4079ff", "#ffff", "#4079ff", "#ffff"]}
                 animationSpeed={3}
@@ -460,11 +460,13 @@ const IntroPages = ({ onComplete }) => {
               style={{
                 fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 transitionDelay: '1.5s',
-                backgroundColor: '#374151',
-                border: '1px solid #4b5563'
+                backgroundColor: '#4079ff',
+                border: '1px solid #4079ff',
+                color: '#ffffff',
+                fontWeight: '600'
               }}
             >
-              <ShinyText text="Skip" speed={3} className="text-sm" />
+              Skip
             </button>
           )}
 
@@ -475,16 +477,14 @@ const IntroPages = ({ onComplete }) => {
             style={{
               fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               transitionDelay: currentPage === pages.length - 1 ? '1.5s' : '1.6s',
-              backgroundColor: '#374151',
-              border: '1px solid #4b5563'
+              backgroundColor: '#4079ff',
+              border: '1px solid #4079ff',
+              color: '#ffffff',
+              fontWeight: '600'
             }}
           >
-            <ShinyText 
-              text={currentPage === pages.length - 1 ? 'Get Started' : 'Next'} 
-              speed={currentPage === pages.length - 1 ? 2 : 3} 
-              className="text-sm" 
-            />
-            <ArrowRight className="w-3 h-3 text-white" />
+            {currentPage === pages.length - 1 ? 'Get Started' : 'Next'}
+            <ArrowRight className="w-3 h-3 text-current" />
           </button>
         </div>
       </div>

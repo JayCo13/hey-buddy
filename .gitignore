@@ -119,3 +119,6 @@ frontend/public/workbox-*.js
 # PWA files
 frontend/public/manifest.json
 frontend/public/robots.txt
+
+# Local Netlify folder
+.netlify

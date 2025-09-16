@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProfileScreen from './ProfileScreen';
+import PWADiagnostics from './PWADiagnostics';
+import MobileMicrophonePermission from './MobileMicrophonePermission';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
-import { Signal, Wifi, Battery, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, History } from 'lucide-react';
+import piperService from '../services/piperService';
+import { Signal, Wifi, Battery, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, History, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
 
@@ -9,6 +12,9 @@ const MainScreen = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [playingAudio, setPlayingAudio] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showMicrophonePermission, setShowMicrophonePermission] = useState(false);
   
   // Voice activation context
   const {
@@ -16,7 +22,12 @@ const MainScreen = ({ onNavigate }) => {
     audioLevel,
     error,
     isInitialized,
-    showLoading
+    showLoading,
+    currentGreeting,
+    greetingInitialized,
+    triggerGreetingSpeech,
+    forceSpeakGreeting,
+    testSpeech
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -39,13 +50,82 @@ const MainScreen = ({ onNavigate }) => {
     }
   };
 
-  // Test function to simulate wake word detection
-  const testWakeWord = () => {
-    console.log('Testing wake word detection...');
-    window.dispatchEvent(new CustomEvent('wakeWordDetected', {
-      detail: { wakeWord: 'hey buddy', transcription: 'hey buddy test' }
-    }));
+  // Enable speech on first user interaction
+  const enableSpeech = async () => {
+    if (!speechEnabled) {
+      setSpeechEnabled(true);
+      console.log('Speech enabled by user interaction');
+      
+      // Trigger greeting speech now that user has interacted
+      await triggerGreetingSpeech();
+    }
   };
+
+  // Check microphone permission on load
+  useEffect(() => {
+    const checkMicrophonePermission = async () => {
+      try {
+        // Check if we have stored permission
+        const permissionGranted = localStorage.getItem('microphonePermissionGranted');
+        const permissionTime = localStorage.getItem('microphonePermissionTime');
+        
+        // If permission is older than 24 hours, re-request
+        if (permissionTime && Date.now() - parseInt(permissionTime) > 24 * 60 * 60 * 1000) {
+          localStorage.removeItem('microphonePermissionGranted');
+          localStorage.removeItem('microphonePermissionTime');
+        }
+
+        // If no permission or permission expired, show permission modal
+        if (!permissionGranted) {
+          // Small delay to let the app load first
+          setTimeout(() => {
+            setShowMicrophonePermission(true);
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Error checking microphone permission:', error);
+      }
+    };
+
+    checkMicrophonePermission();
+  }, []);
+
+  // Auto-enable speech on first user interaction (optimized)
+  useEffect(() => {
+    let hasTriggered = false;
+    
+    const handleUserInteraction = () => {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
+        hasTriggered = true;
+        console.log('User interaction detected, enabling speech automatically...');
+        enableSpeech();
+      }
+    };
+
+    // Use a single, more specific event listener
+    const events = ['click', 'keydown', 'touchstart'];
+    
+    events.forEach(event => {
+      document.addEventListener(event, handleUserInteraction, { once: true, passive: true });
+    });
+
+    // Fallback timer with longer delay to reduce aggressive triggering
+    const autoEnableTimer = setTimeout(() => {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
+        hasTriggered = true;
+        console.log('Attempting auto-enable speech...');
+        enableSpeech();
+      }
+    }, 3000);
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleUserInteraction);
+      });
+      clearTimeout(autoEnableTimer);
+    };
+  }, [speechEnabled, currentGreeting, greetingInitialized]);
+
 
   const generateWaveform = () => {
     return Array.from({ length: 8 }, (_, i) => (
@@ -83,8 +163,8 @@ const MainScreen = ({ onNavigate }) => {
 
       {/* App Header */}
       <div className="flex items-center justify-between px-6 py-4">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center">
-          <div className="w-8 h-8">
+        <div className="w-11 h-11 rounded-lg flex items-center justify-center">
+          <div className="w-9 h-9">
             <Lottie
               animationData={logoData}
               loop={true}
@@ -94,6 +174,20 @@ const MainScreen = ({ onNavigate }) => {
         </div>
         
         <div className="flex items-center space-x-4">
+          <button 
+            onClick={() => setShowMicrophonePermission(true)}
+            className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1 hover:bg-gray-700 transition-colors"
+          >
+            <Mic className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm font-medium">Mic</span>
+          </button>
+          <button 
+            onClick={() => setShowDiagnostics(true)}
+            className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1 hover:bg-gray-700 transition-colors"
+          >
+            <AlertCircle className="w-4 h-4 text-green-400" />
+            <span className="text-sm font-medium">Diagnostics</span>
+          </button>
           <button className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1">
             <Star className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-medium">Premium</span>
@@ -105,22 +199,87 @@ const MainScreen = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Greeting Section */}
+      {/* Intelligent Greeting Section */}
       <div className="px-6 mb-6">
-        <h1 className="text-2xl font-bold mb-2">
-          Good Morning! Jayden 👋
-        </h1>
-        <p className="text-xl font-bold text-gray-300">
-          Let's see what can I do for you?
-        </p>
-        
-        {/* Test Button for Wake Word */}
-        <button 
-          onClick={testWakeWord}
-          className="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          Test Voice Command
-        </button>
+        {greetingInitialized && currentGreeting ? (
+          <div className="space-y-4">
+            {/* Main Greeting */}
+            <div className="text-center space-y-6">
+              <div className="flex items-center justify-center space-x-3">
+                {/* Modern Hand Wave Icon */}
+                <h1 className="text-3xl font-light text-white/90 tracking-wide">
+                👋🏻 Hey Jayden
+                </h1>
+              </div>
+              
+              {/* Modern Speech Status Indicator */}
+              <div className="flex justify-center">
+                {!speechEnabled && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
+                    <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
+                  </div>
+                )}
+                
+                {speechEnabled && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full mr-3"></div>
+                    <span className="text-sm font-medium text-emerald-300">AI voice active</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            
+            {/* Modern Context Display */}
+            <div className="flex justify-center space-x-6 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                <span className="text-gray-400">Time:</span>
+                <span className="text-white/80 font-medium capitalize">{currentGreeting.timeOfDay}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-1.5 h-1.5 bg-purple-400 rounded-full"></div>
+                <span className="text-gray-400">Mood:</span>
+                <span className="text-white/80 font-medium capitalize">{currentGreeting.mood}</span>
+              </div>
+            </div>
+            
+          </div>
+        ) : (
+          <div className="text-center space-y-6">
+            <div className="flex items-center justify-center space-x-3">
+              {/* Modern Hand Wave Icon - Loading State */}
+              <div className="relative group">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.5 12C19.43 12 21 10.43 21 8.5S19.43 5 17.5 5C16.74 5 16.06 5.33 15.58 5.85L14.5 7H13.5L12.5 5.5C12.22 5.19 11.85 5 11.5 5H10.5L9.5 6.5C9.22 6.81 8.85 7 8.5 7H7.5L6.42 5.85C5.94 5.33 5.26 5 4.5 5C2.57 5 1 6.57 1 8.5S2.57 12 4.5 12H17.5Z"/>
+                  </svg>
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse shadow-md"></div>
+              </div>
+              
+              <h1 className="text-3xl font-light text-white/90 tracking-wide">
+                Hello Jayden
+              </h1>
+            </div>
+            
+            {/* Modern Loading Indicator */}
+            <div className="flex justify-center">
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 backdrop-blur-sm">
+                <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse mr-3"></div>
+                <span className="text-sm font-medium text-blue-300">Preparing your greeting</span>
+              </div>
+            </div>
+            
+            <div className="flex justify-center">
+              <div className="inline-flex items-center space-x-2 text-sm text-gray-400">
+                <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
+                <span>Analyzing context</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Feature Cards */}
@@ -290,6 +449,48 @@ const MainScreen = ({ onNavigate }) => {
           <div className="text-center">
             <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-white text-lg font-medium">Listening...</p>
+          </div>
+        </div>
+      )}
+
+      {/* PWA Diagnostics */}
+      {showDiagnostics && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="relative">
+            <button
+              onClick={() => setShowDiagnostics(false)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
+            >
+              ×
+            </button>
+            <PWADiagnostics />
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Microphone Permission */}
+      {showMicrophonePermission && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="relative">
+            <button
+              onClick={() => setShowMicrophonePermission(false)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
+            >
+              ×
+            </button>
+            <MobileMicrophonePermission 
+              onPermissionGranted={() => {
+                setShowMicrophonePermission(false);
+                console.log('Microphone permission granted!');
+                // Try to initialize voice activation
+                if (triggerGreetingSpeech) {
+                  triggerGreetingSpeech();
+                }
+              }}
+              onPermissionDenied={() => {
+                console.log('Microphone permission denied');
+              }}
+            />
           </div>
         </div>
       )}

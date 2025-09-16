@@ -5,6 +5,7 @@ import { register } from './utils/serviceWorkerRegistration';
 import SplashScreen from './components/SplashScreen';
 import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
+import InstallPrompt from './components/InstallPrompt';
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -61,7 +62,12 @@ function App() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <>
+      <AppNavigator />
+      <InstallPrompt />
+    </>
+  );
 }
 
 export default App;

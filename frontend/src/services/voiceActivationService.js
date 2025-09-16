@@ -100,6 +100,28 @@ class VoiceActivationService {
   }
 
   /**
+   * Temporarily pause voice activation (for TTS playback)
+   */
+  pauseVoiceActivation() {
+    if (this.isListening) {
+      console.log('Pausing voice activation for TTS playback');
+      this.stopRealTimeWakeWordDetection();
+      this.stopAudioLevelMonitoring();
+    }
+  }
+
+  /**
+   * Resume voice activation after TTS playback
+   */
+  resumeVoiceActivation() {
+    if (this.isListening) {
+      console.log('Resuming voice activation after TTS playback');
+      this.startAudioLevelMonitoring();
+      this.startRealTimeWakeWordDetection();
+    }
+  }
+
+  /**
    * Start monitoring audio levels with enhanced voice detection
    */
   startAudioLevelMonitoring() {
