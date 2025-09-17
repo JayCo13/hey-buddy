@@ -195,19 +195,19 @@ const MainScreen = ({ onNavigate }) => {
               
               {/* Modern Speech Status Indicator */}
               <div className="flex justify-center">
-                {!speechEnabled && (
-                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
-                    <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
-                    <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
-                  </div>
-                )}
-                
-                {speechEnabled && (
-                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/30 backdrop-blur-sm">
-                    <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full mr-3"></div>
-                    <span className="text-sm font-medium text-emerald-300">AI voice active</span>
-                  </div>
-                )}
+                 {!isInitialized && (
+                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
+                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
+                     <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
+                   </div>
+                 )}
+                 
+                 {isInitialized && (
+                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/30 backdrop-blur-sm">
+                     <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full mr-3"></div>
+                     <span className="text-sm font-medium text-emerald-300">AI voice active</span>
+                   </div>
+                 )}
               </div>
             </div>
             
