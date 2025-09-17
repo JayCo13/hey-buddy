@@ -1,13 +1,152 @@
-import React, { useState } from 'react';
-import { Signal, Wifi, Mic, Play, Pause, Home, User } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Signal, Wifi, Mic, Play, Pause, Home, User, Volume2, VolumeX } from 'lucide-react';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import { useAIChat } from '../hooks/useAIChat';
 
 const RecordScreen = ({ onNavigate }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [activeTab, setActiveTab] = useState('record');
+  const [currentTranscript, setCurrentTranscript] = useState('');
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSupported, setIsSupported] = useState(false);
+  
+  const recordingIntervalRef = useRef(null);
+  const lastSpokenIdRef = useRef(null);
 
-  const handleStartRecording = () => {
-    setIsRecording(!isRecording);
+  // Initialize AI chat and speech recognition
+  const { messages, isProcessing, sendMessage, clearMessages } = useAIChat();
+  
+  const { 
+    isListening, 
+    transcript, 
+    isSupported: speechSupported, 
+    startListening, 
+    stopListening, 
+    resetTranscript 
+  } = useSpeechRecognition({
+    continuous: true,
+    interimResults: true,
+    lang: "en-US",
+    onResult: (text, isFinal) => {
+      setCurrentTranscript(text);
+      if (isFinal && text.trim()) {
+        // Auto-send after a brief pause when speech is final
+        setTimeout(() => {
+          handleSendMessage(text);
+        }, 500);
+      }
+    },
+    onError: (error) => {
+      console.error("Speech recognition error:", error);
+      alert(`Speech recognition error: ${error}`);
+    },
+    onEnd: () => {
+      // If we have transcript but it wasn't sent yet, keep it for manual send
+      if (currentTranscript.trim()) {
+        setCurrentTranscript(currentTranscript);
+      }
+    },
+  });
+
+  // Update supported state
+  useEffect(() => {
+    setIsSupported(speechSupported);
+  }, [speechSupported]);
+
+  // Auto TTS for latest AI reply
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!messages || messages.length === 0) return;
+    
+    const last = [...messages].reverse().find((m) => m.type === "ai" && !m.error);
+    if (!last) return;
+    if (lastSpokenIdRef.current === last.id) return;
+
+    const utter = new SpeechSynthesisUtterance(last.content);
+    utter.rate = 0.95;
+    utter.pitch = 1;
+    utter.volume = 1;
+    
+    utter.onstart = () => setIsSpeaking(true);
+    utter.onend = () => setIsSpeaking(false);
+    utter.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+    lastSpokenIdRef.current = last.id;
+  }, [messages]);
+
+  const handleStartRecording = async () => {
+    if (!isSupported) {
+      alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.");
+      return;
+    }
+
+    if (isListening) {
+      stopListening();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    } else {
+      try {
+        // Request microphone permission
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach((track) => track.stop());
+        }
+        
+        resetTranscript();
+        setCurrentTranscript("");
+        startListening({ continuousOverride: false });
+        setIsRecording(true);
+        
+        // Start recording timer
+        setRecordingTime(0);
+        recordingIntervalRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+      } catch (error) {
+        console.error("Microphone permission denied:", error);
+        alert("Cannot access microphone. Please allow microphone permission in your browser.");
+      }
+    }
+  };
+
+  const handleSendMessage = (message) => {
+    const textToSend = message || currentTranscript;
+    if (textToSend.trim()) {
+      sendMessage(textToSend.trim());
+      setCurrentTranscript("");
+      resetTranscript();
+    }
+  };
+
+  const stopSpeaking = () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  };
+
+  const speakMessage = (content) => {
+    if ("speechSynthesis" in window) {
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(content);
+      utterance.rate = 0.8;
+      utterance.pitch = 1;
+      utterance.volume = 0.8;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const handleTabChange = (tabId) => {
@@ -41,8 +180,10 @@ const RecordScreen = ({ onNavigate }) => {
       <div className="flex-1 flex flex-col items-center justify-center px-6">
         {/* Recording Visualizer */}
         <div className="mb-8">
-          <div className="w-32 h-32 bg-gray-800 rounded-full flex items-center justify-center mb-6">
-            <Mic className="w-16 h-16 text-gray-300" />
+          <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 transition-colors ${
+            isListening ? 'bg-red-600 animate-pulse' : 'bg-gray-800'
+          }`}>
+            <Mic className={`w-16 h-16 ${isListening ? 'text-white' : 'text-gray-300'}`} />
           </div>
           
           {/* Audio Waveform */}
@@ -51,7 +192,7 @@ const RecordScreen = ({ onNavigate }) => {
               <div 
                 key={i} 
                 className={`rounded-sm ${
-                  isRecording ? 'bg-blue-500 animate-pulse' : 'bg-gray-600'
+                  isListening ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
                 }`}
                 style={{ 
                   width: '4px', 
@@ -62,6 +203,28 @@ const RecordScreen = ({ onNavigate }) => {
             ))}
           </div>
         </div>
+
+        {/* Live Transcription */}
+        {currentTranscript && (
+          <div className="mb-6 w-full max-w-md">
+            <div className="bg-gray-800 rounded-xl p-4">
+              <h4 className="text-sm font-medium text-gray-400 mb-2">Live Transcription</h4>
+              <p className="text-white">{currentTranscript}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Processing Indicator */}
+        {isProcessing && (
+          <div className="mb-6 w-full max-w-md">
+            <div className="bg-blue-800 rounded-xl p-4">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="text-white">AI is thinking...</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Recording Controls */}
         <div className="text-center">
@@ -91,27 +254,91 @@ const RecordScreen = ({ onNavigate }) => {
           )}
         </div>
 
-        {/* Recent Recordings */}
-        <div className="mt-12 w-full">
-          <h3 className="text-lg font-semibold mb-4">Recent Recordings</h3>
-          <div className="space-y-3">
-            {[
-              { id: 1, title: 'Meeting Notes', duration: '2:34', date: 'Today' },
-              { id: 2, title: 'Voice Memo', duration: '0:45', date: 'Yesterday' },
-              { id: 3, title: 'Interview Prep', duration: '5:12', date: '2 days ago' }
-            ].map((recording) => (
-              <div key={recording.id} className="bg-gray-800 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium">{recording.title}</h4>
-                  <p className="text-sm text-gray-400">{recording.duration} • {recording.date}</p>
-                </div>
-                <button className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors">
-                  <Play className="w-4 h-4 text-gray-300" />
+        {/* Recording Controls */}
+        <div className="text-center">
+          <button
+            onClick={handleStartRecording}
+            disabled={!isSupported}
+            className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${
+              isListening 
+                ? 'bg-red-600 hover:bg-red-700' 
+                : isSupported
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-gray-600 cursor-not-allowed'
+            }`}
+          >
+            {isListening ? (
+              <Pause className="w-8 h-8 text-white" />
+            ) : (
+              <Play className="w-8 h-8 text-white" />
+            )}
+          </button>
+          
+          <p className="text-gray-300 mt-4 text-lg">
+            {!isSupported 
+              ? 'Speech recognition not supported' 
+              : isListening 
+              ? 'Recording...' 
+              : 'Tap to start recording'}
+          </p>
+          
+          {isListening && (
+            <p className="text-red-400 mt-2 font-mono text-xl">
+              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+            </p>
+          )}
+        </div>
+
+        {/* Conversation History */}
+        {messages.length > 0 && (
+          <div className="mt-8 w-full max-w-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Conversation</h3>
+              <div className="flex items-center space-x-2">
+                {isSpeaking && (
+                  <button
+                    onClick={stopSpeaking}
+                    className="w-8 h-8 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center transition-colors"
+                  >
+                    <VolumeX className="w-4 h-4 text-white" />
+                  </button>
+                )}
+                <button
+                  onClick={clearMessages}
+                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                >
+                  Clear
                 </button>
               </div>
-            ))}
+            </div>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {messages.map((message) => (
+                <div key={message.id} className={`rounded-xl p-4 ${
+                  message.type === 'user' 
+                    ? 'bg-blue-800 ml-8' 
+                    : 'bg-gray-800 mr-8'
+                }`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="text-white">{message.content}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                    {message.type === 'ai' && (
+                      <button
+                        onClick={() => speakMessage(message.content)}
+                        className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors ml-2"
+                      >
+                        <Volume2 className="w-4 h-4 text-gray-300" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Bottom Navigation */}
