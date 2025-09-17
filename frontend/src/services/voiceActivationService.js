@@ -385,8 +385,13 @@ class VoiceActivationService {
    * Notify wake word detected
    */
   notifyWakeWordDetected(wakeWord, transcription) {
+    console.log('🎤 VoiceActivationService: notifyWakeWordDetected called with:', wakeWord, transcription);
+    console.log('🎤 VoiceActivationService: callback available:', !!this.callbacks.onWakeWordDetected);
     if (this.callbacks.onWakeWordDetected) {
+      console.log('🎤 VoiceActivationService: Calling wake word callback...');
       this.callbacks.onWakeWordDetected(wakeWord, transcription);
+    } else {
+      console.error('🎤 VoiceActivationService: No wake word callback available!');
     }
   }
 
@@ -494,11 +499,11 @@ class VoiceActivationService {
       );
       
       if (detectedVariation) {
-        console.log(`Wake word detected! Variation: "${detectedVariation}" in "${filteredTranscription}"`);
+        console.log(`🎤 Wake word detected! Variation: "${detectedVariation}" in "${filteredTranscription}"`);
         this.notifyStatusChange('wake_word_detected');
         this.notifyWakeWordDetected('Hey Buddy', filteredTranscription);
       } else {
-        console.log('No wake word variation found in:', filteredTranscription);
+        console.log('🎤 No wake word variation found in:', filteredTranscription);
       }
     } else {
       console.log('No speech detected, skipping wake word check');

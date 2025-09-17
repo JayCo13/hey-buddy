@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import ProfileScreen from './ProfileScreen';
-import PWADiagnostics from './PWADiagnostics';
 import MobileMicrophonePermission from './MobileMicrophonePermission';
-import IOSPWACompatibility from './IOSPWACompatibility';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
-import piperService from '../services/piperService';
-import { Signal, Wifi, Battery, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, History, AlertCircle } from 'lucide-react';
+import { Signal, Wifi, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
 
@@ -14,9 +11,7 @@ const MainScreen = ({ onNavigate }) => {
   const [playingAudio, setPlayingAudio] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showMicrophonePermission, setShowMicrophonePermission] = useState(false);
-  const [showiOSCompatibility, setShowiOSCompatibility] = useState(false);
   
   // Voice activation context
   const {
@@ -27,9 +22,7 @@ const MainScreen = ({ onNavigate }) => {
     showLoading,
     currentGreeting,
     greetingInitialized,
-    triggerGreetingSpeech,
-    forceSpeakGreeting,
-    testSpeech
+    triggerGreetingSpeech
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -77,23 +70,11 @@ const MainScreen = ({ onNavigate }) => {
           localStorage.removeItem('microphonePermissionTime');
         }
 
-        // Check if this is iOS PWA
-        const isIOSPWA = () => {
-          const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-          const isIOSStandalone = window.navigator.standalone === true;
-          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-          return (isStandalone || isIOSStandalone) && isIOS;
-        };
-
         // If no permission or permission expired, show appropriate modal
         if (!permissionGranted) {
           // Small delay to let the app load first
           setTimeout(() => {
-            if (isIOSPWA()) {
-              setShowiOSCompatibility(true);
-            } else {
-              setShowMicrophonePermission(true);
-            }
+            setShowMicrophonePermission(true);
           }, 2000);
         }
       } catch (error) {
@@ -188,33 +169,6 @@ const MainScreen = ({ onNavigate }) => {
         </div>
         
         <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => {
-              const isIOSPWA = () => {
-                const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-                const isIOSStandalone = window.navigator.standalone === true;
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                return (isStandalone || isIOSStandalone) && isIOS;
-              };
-              
-              if (isIOSPWA()) {
-                setShowiOSCompatibility(true);
-              } else {
-                setShowMicrophonePermission(true);
-              }
-            }}
-            className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1 hover:bg-gray-700 transition-colors"
-          >
-            <Mic className="w-4 h-4 text-yellow-400" />
-            <span className="text-sm font-medium">Mic</span>
-          </button>
-          <button 
-            onClick={() => setShowDiagnostics(true)}
-            className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1 hover:bg-gray-700 transition-colors"
-          >
-            <AlertCircle className="w-4 h-4 text-green-400" />
-            <span className="text-sm font-medium">Diagnostics</span>
-          </button>
           <button className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1">
             <Star className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-medium">Premium</span>
@@ -480,74 +434,7 @@ const MainScreen = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* PWA Diagnostics */}
-      {showDiagnostics && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="relative">
-            <button
-              onClick={() => setShowDiagnostics(false)}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-            >
-              ×
-            </button>
-            <PWADiagnostics />
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Microphone Permission */}
-      {showMicrophonePermission && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="relative">
-            <button
-              onClick={() => setShowMicrophonePermission(false)}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-            >
-              ×
-            </button>
-            <MobileMicrophonePermission 
-              onPermissionGranted={() => {
-                setShowMicrophonePermission(false);
-                console.log('Microphone permission granted!');
-                // Try to initialize voice activation
-                if (triggerGreetingSpeech) {
-                  triggerGreetingSpeech();
-                }
-              }}
-              onPermissionDenied={() => {
-                console.log('Microphone permission denied');
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* iOS PWA Compatibility */}
-      {showiOSCompatibility && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="relative">
-            <button
-              onClick={() => setShowiOSCompatibility(false)}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
-            >
-              ×
-            </button>
-            <IOSPWACompatibility 
-              onPermissionGranted={() => {
-                setShowiOSCompatibility(false);
-                console.log('iOS PWA compatibility test passed!');
-                // Try to initialize voice activation
-                if (triggerGreetingSpeech) {
-                  triggerGreetingSpeech();
-                }
-              }}
-              onPermissionDenied={() => {
-                console.log('iOS PWA compatibility test failed');
-              }}
-            />
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 };

@@ -1,6 +1,6 @@
 # Hey Buddy - AI-Powered Productivity App
 
-A Progressive Web App (PWA) with offline-first functionality using IndexedDB for reliable data management.
+A web application with offline-first functionality using IndexedDB for reliable data management.
 
 ## Features
 
@@ -11,7 +11,6 @@ A Progressive Web App (PWA) with offline-first functionality using IndexedDB for
 - **Schedule Management**: Calendar events with reminders
 - **Meeting Transcripts**: AI-powered speech transcription and summaries
 - **Face Recognition**: Secure login using facial recognition
-- **PWA Features**: Installable, offline-capable, and responsive
 
 ## Technology Stack
 
@@ -20,7 +19,6 @@ A Progressive Web App (PWA) with offline-first functionality using IndexedDB for
 - **Tailwind CSS** - Styling
 - **Dexie.js** - IndexedDB wrapper for simplified database operations
 - **Dexie React Hooks** - React hooks for database operations
-- **Service Worker** - Offline functionality and caching
 
 ### Backend
 - **FastAPI** - Python web framework
@@ -281,7 +279,7 @@ return (
 );
 ```
 
-## PWA Features
+## Web App Features
 
 ### Installation
 The app can be installed on supported devices:
@@ -292,7 +290,6 @@ The app can be installed on supported devices:
 - Works without internet connection
 - Data is stored locally in IndexedDB
 - Automatic sync when connection is restored
-- Service worker caches static assets
 
 ### Background Sync
 - Queues operations when offline
@@ -330,7 +327,6 @@ The implementation includes comprehensive error handling:
 
 - **IndexedDB**: Fast local storage for large datasets
 - **Dexie.js**: Optimized queries and transactions
-- **Service Worker**: Efficient caching strategies
 - **React Hooks**: Minimal re-renders with useLiveQuery
 
 ## Security

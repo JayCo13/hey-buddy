@@ -1,7 +1,7 @@
 /**
  * PiperService - Text-to-Speech service with true offline capability
  * Uses @realtimex/piper-tts-web for offline TTS, falls back to Web Speech API
- * Provides reliable speech synthesis that works in PWAs offline
+ * Provides reliable speech synthesis that works offline
  */
 
 class PiperService {
@@ -36,20 +36,35 @@ class PiperService {
 
     try {
       // Ultra-fast initialization - minimal steps
-      // Import and setup in one go
-      const piperTTS = await import('@realtimex/piper-tts-web');
+      // Import and setup in one go with error handling
+      let piperTTS;
+      try {
+        piperTTS = await import('@realtimex/piper-tts-web');
+        this.useOfflinePiper = true;
+        this.modelName = 'Piper TTS';
+        this.piperTTS = piperTTS;
+        console.log('Piper TTS loaded successfully');
+      } catch (importError) {
+        console.warn('Piper TTS import failed, falling back to Web Speech API:', importError.message);
+        this.useOfflinePiper = false;
+        this.useWebSpeech = true;
+        this.modelName = 'Web Speech API';
+        // Load voices for Web Speech API fallback
+        await this.loadVoices();
+      }
       
-      this.useOfflinePiper = true;
-      this.modelName = 'Piper TTS';
-      this.piperTTS = piperTTS;
       this.isInitialized = true;
-      
       return true;
 
     } catch (error) {
       console.error('Piper TTS initialization failed:', error);
-      this.isInitialized = false;
-      throw error;
+      // Fallback to Web Speech API
+      this.useOfflinePiper = false;
+      this.useWebSpeech = true;
+      this.modelName = 'Web Speech API';
+      this.isInitialized = true;
+      await this.loadVoices();
+      return true;
     }
   }
 

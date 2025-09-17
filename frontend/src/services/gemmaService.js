@@ -38,8 +38,19 @@ class GemmaService {
         onProgress({ stage: 'loading_transformers', message: 'Loading Transformers.js...' });
       }
 
-      // Import Transformers.js
-      const { AutoProcessor, AutoModelForImageTextToText } = await import('@huggingface/transformers');
+      // Import Transformers.js with error handling
+      let AutoProcessor, AutoModelForImageTextToText;
+      try {
+        const transformers = await import('@huggingface/transformers');
+        AutoProcessor = transformers.AutoProcessor;
+        AutoModelForImageTextToText = transformers.AutoModelForImageTextToText;
+      } catch (importError) {
+        console.warn('Failed to import Transformers.js, AI features will be disabled:', importError.message);
+        // Don't throw error, just mark as not initialized
+        this.isInitialized = false;
+        this.isLoading = false;
+        return false;
+      }
 
       if (onProgress) {
         onProgress({ stage: 'loading_processor', message: 'Loading Gemma processor...' });

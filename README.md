@@ -9,7 +9,6 @@ A full-stack productivity application with AI-powered features, built with React
 - **Schedule Management**: Plan and organize your schedule
 - **Face Recognition**: Secure authentication using facial recognition
 - **Offline Support**: Works offline with local database storage
-- **PWA Ready**: Progressive Web App with service worker
 
 ## Tech Stack
 
@@ -17,7 +16,6 @@ A full-stack productivity application with AI-powered features, built with React
 - **React**: Modern UI framework
 - **Tailwind CSS**: Utility-first CSS framework
 - **IndexedDB**: Local database for offline functionality
-- **Service Worker**: PWA capabilities
 
 ### Backend
 - **FastAPI**: Modern Python web framework

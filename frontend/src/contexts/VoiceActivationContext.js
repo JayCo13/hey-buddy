@@ -3,7 +3,6 @@ import voiceActivationService from '../services/voiceActivationService';
 import whisperService from '../services/whisperService';
 import greetingService from '../services/greetingService';
 import piperService from '../services/piperService';
-import serviceWorkerManager from '../services/serviceWorkerManager';
 
 const VoiceActivationContext = createContext();
 
@@ -124,7 +123,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('Piper service ready:', piperService.isReady());
     console.log('Piper service status:', piperService.getStatus());
     console.log('Greeting service status:', greetingService.getServiceStatus());
-    console.log('Service worker status:', serviceWorkerManager.getStatus());
     console.log('==================');
   };
 
@@ -175,15 +173,28 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       try {
         console.log('Starting voice activation initialization...');
         
-        // Register service worker for background AI initialization
-        console.log('Registering service worker...');
-        await serviceWorkerManager.register();
-        
         // Initialize greeting system first (non-blocking)
         console.log('Initializing greeting system...');
         await initializeGreetingSystem();
         console.log('Greeting system initialization completed');
         debugState(); // Debug state after greeting initialization
+        
+        // Initialize voice activation service
+        console.log('Initializing voice activation service...');
+        await voiceActivationService.initialize();
+        
+        // Set up callbacks for voice activation
+        voiceActivationService.setWakeWordCallback(handleWakeWordDetected);
+        voiceActivationService.setAudioLevelCallback(handleAudioLevelChange);
+        voiceActivationService.setErrorCallback(handleError);
+        voiceActivationService.setStatusCallback(handleStatusChange);
+        
+        console.log('Voice activation service initialized');
+        
+        // Initialize whisper service for speech recognition
+        console.log('Initializing whisper service...');
+        await whisperService.initialize();
+        console.log('Whisper service initialized');
         
         // ULTRA-FAST INITIALIZATION
         console.log('Initializing TTS...');
@@ -237,16 +248,28 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     }
   }, [isInitialized, currentGreeting, greetingInitialized]);
 
+  // Auto-start voice activation when everything is ready
+  useEffect(() => {
+    if (isInitialized && !isListening) {
+      console.log('Starting voice activation automatically...');
+      startRealTimeDetection();
+    }
+  }, [isInitialized]);
+
   // Handle wake word detection
   const handleWakeWordDetected = async (wakeWord, transcription) => {
-    console.log('Wake word detected:', wakeWord, transcription);
+    console.log('🎤 Wake word detected:', wakeWord, transcription);
+    console.log('🎤 onNavigateToRecord callback:', onNavigateToRecord);
     setWakeWordDetected(true);
     setIsProcessing(true);
     setShowLoading(true);
     
     // Navigate to record screen
     if (onNavigateToRecord) {
+      console.log('🎤 Navigating to record screen...');
       onNavigateToRecord();
+    } else {
+      console.error('🎤 onNavigateToRecord callback is not available!');
     }
     
     // Hide loading after 2 seconds and reset states

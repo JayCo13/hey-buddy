@@ -38,8 +38,16 @@ class WhisperService {
         onProgress({ stage: 'loading_transformers', message: 'Loading Transformers.js...' });
       }
 
-      // Import Transformers.js
-      const { AutoProcessor, AutoModelForSpeechSeq2Seq } = await import('@huggingface/transformers');
+      // Import Transformers.js with error handling
+      let AutoProcessor, AutoModelForSpeechSeq2Seq;
+      try {
+        const transformers = await import('@huggingface/transformers');
+        AutoProcessor = transformers.AutoProcessor;
+        AutoModelForSpeechSeq2Seq = transformers.AutoModelForSpeechSeq2Seq;
+      } catch (importError) {
+        console.error('Failed to import Transformers.js:', importError);
+        throw new Error('Transformers.js library failed to load. Please refresh the page.');
+      }
 
       if (onProgress) {
         onProgress({ stage: 'loading_processor', message: 'Loading Whisper processor...' });

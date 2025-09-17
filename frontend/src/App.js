@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import './App.css';
 import { initializeDatabase } from './db/database';
-import { register } from './utils/serviceWorkerRegistration';
 import SplashScreen from './components/SplashScreen';
 import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
-import InstallPrompt from './components/InstallPrompt';
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -21,16 +19,6 @@ function App() {
     };
     
     initDB();
-
-    // Register service worker
-    register({
-      onSuccess: (registration) => {
-        console.log('Service worker registration successful:', registration);
-      },
-      onUpdate: (registration) => {
-        console.log('Service worker update available:', registration);
-      }
-    });
 
     // Show splash screen for 5 seconds, then intro
     const splashTimer = setTimeout(() => {
@@ -62,12 +50,7 @@ function App() {
     );
   }
 
-  return (
-    <>
-      <AppNavigator />
-      <InstallPrompt />
-    </>
-  );
+  return <AppNavigator />;
 }
 
 export default App;

@@ -1,11 +1,8 @@
 {
   "name": "hey-buddy",
   "version": "1.0.0",
-  "description": "Hey Buddy - AI Voice Assistant PWA",
+  "description": "Hey Buddy - AI Voice Assistant",
   "private": true,
-  "workspaces": [
-    "frontend"
-  ],
   "scripts": {
     "build": "cd frontend && npm run build",
     "start": "cd frontend && npm start",
@@ -16,7 +13,6 @@
     "url": "https://github.com/JayCo13/hey-buddy.git"
   },
   "keywords": [
-    "pwa",
     "ai",
     "voice-assistant",
     "react",

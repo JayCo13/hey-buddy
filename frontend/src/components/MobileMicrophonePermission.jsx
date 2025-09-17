@@ -1,21 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, AlertCircle, Smartphone, Globe } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mic, AlertCircle } from 'lucide-react';
 
 const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied }) => {
   const [isRequesting, setIsRequesting] = useState(false);
   const [error, setError] = useState(null);
-  const [isPWA, setIsPWA] = useState(false);
-
-  useEffect(() => {
-    // Check if running as PWA
-    const checkPWA = () => {
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-      const isIOSPWA = window.navigator.standalone === true;
-      setIsPWA(isStandalone || isIOSPWA);
-    };
-    
-    checkPWA();
-  }, []);
 
   const requestMicrophonePermission = async () => {
     setIsRequesting(true);
@@ -59,32 +47,19 @@ const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied })
     }
   };
 
-  const openInBrowser = () => {
-    // Try to open the current URL in the browser
-    const currentUrl = window.location.href;
-    window.open(currentUrl, '_blank');
-  };
-
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm mx-auto">
       <div className="text-center mb-6">
         <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          {isPWA ? (
-            <Smartphone className="w-8 h-8 text-blue-600" />
-          ) : (
-            <Mic className="w-8 h-8 text-blue-600" />
-          )}
+          <Mic className="w-8 h-8 text-blue-600" />
         </div>
         
         <h2 className="text-xl font-bold text-gray-900 mb-2">
-          {isPWA ? 'Mobile Microphone Access' : 'Microphone Permission'}
+          Microphone Permission
         </h2>
         
         <p className="text-gray-600 text-sm">
-          {isPWA 
-            ? 'This PWA needs microphone access to work with voice commands'
-            : 'Allow microphone access to use voice features'
-          }
+          Allow microphone access to use voice features
         </p>
       </div>
 
@@ -98,18 +73,6 @@ const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied })
       )}
 
       <div className="space-y-4">
-        {isPWA && (
-          <div className="p-3 bg-yellow-50 rounded-lg">
-            <div className="flex items-start">
-              <AlertCircle className="w-4 h-4 text-yellow-600 mr-2 mt-0.5" />
-              <div className="text-sm text-yellow-800">
-                <p className="font-medium mb-1">Running as PWA</p>
-                <p>If microphone access fails, try opening the app in Safari first to grant permissions.</p>
-              </div>
-            </div>
-          </div>
-        )}
-
         <button
           onClick={requestMicrophonePermission}
           disabled={isRequesting}
@@ -128,16 +91,6 @@ const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied })
           )}
         </button>
 
-        {isPWA && (
-          <button
-            onClick={openInBrowser}
-            className="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors flex items-center justify-center"
-          >
-            <Globe className="w-4 h-4 mr-2" />
-            Open in Browser Instead
-          </button>
-        )}
-
         <div className="text-center">
           <button
             onClick={onPermissionDenied}
@@ -150,8 +103,7 @@ const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied })
 
       <div className="mt-4 pt-4 border-t border-gray-200">
         <div className="text-xs text-gray-500 text-center">
-          <p className="mb-1">💡 Tip: Grant microphone permission in Safari first</p>
-          <p>Then install the PWA for full functionality</p>
+          <p className="mb-1">💡 Tip: Grant microphone permission to use voice features</p>
         </div>
       </div>
     </div>
