@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ProfileScreen from './ProfileScreen';
 import PWADiagnostics from './PWADiagnostics';
 import MobileMicrophonePermission from './MobileMicrophonePermission';
+import IOSPWACompatibility from './IOSPWACompatibility';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import piperService from '../services/piperService';
 import { Signal, Wifi, Battery, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, History, AlertCircle } from 'lucide-react';
@@ -15,6 +16,7 @@ const MainScreen = ({ onNavigate }) => {
   const [speechEnabled, setSpeechEnabled] = useState(false);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showMicrophonePermission, setShowMicrophonePermission] = useState(false);
+  const [showiOSCompatibility, setShowiOSCompatibility] = useState(false);
   
   // Voice activation context
   const {
@@ -75,11 +77,23 @@ const MainScreen = ({ onNavigate }) => {
           localStorage.removeItem('microphonePermissionTime');
         }
 
-        // If no permission or permission expired, show permission modal
+        // Check if this is iOS PWA
+        const isIOSPWA = () => {
+          const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+          const isIOSStandalone = window.navigator.standalone === true;
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          return (isStandalone || isIOSStandalone) && isIOS;
+        };
+
+        // If no permission or permission expired, show appropriate modal
         if (!permissionGranted) {
           // Small delay to let the app load first
           setTimeout(() => {
-            setShowMicrophonePermission(true);
+            if (isIOSPWA()) {
+              setShowiOSCompatibility(true);
+            } else {
+              setShowMicrophonePermission(true);
+            }
           }, 2000);
         }
       } catch (error) {
@@ -175,7 +189,20 @@ const MainScreen = ({ onNavigate }) => {
         
         <div className="flex items-center space-x-4">
           <button 
-            onClick={() => setShowMicrophonePermission(true)}
+            onClick={() => {
+              const isIOSPWA = () => {
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+                const isIOSStandalone = window.navigator.standalone === true;
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                return (isStandalone || isIOSStandalone) && isIOS;
+              };
+              
+              if (isIOSPWA()) {
+                setShowiOSCompatibility(true);
+              } else {
+                setShowMicrophonePermission(true);
+              }
+            }}
             className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1 hover:bg-gray-700 transition-colors"
           >
             <Mic className="w-4 h-4 text-yellow-400" />
@@ -489,6 +516,33 @@ const MainScreen = ({ onNavigate }) => {
               }}
               onPermissionDenied={() => {
                 console.log('Microphone permission denied');
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* iOS PWA Compatibility */}
+      {showiOSCompatibility && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="relative">
+            <button
+              onClick={() => setShowiOSCompatibility(false)}
+              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600"
+            >
+              ×
+            </button>
+            <IOSPWACompatibility 
+              onPermissionGranted={() => {
+                setShowiOSCompatibility(false);
+                console.log('iOS PWA compatibility test passed!');
+                // Try to initialize voice activation
+                if (triggerGreetingSpeech) {
+                  triggerGreetingSpeech();
+                }
+              }}
+              onPermissionDenied={() => {
+                console.log('iOS PWA compatibility test failed');
               }}
             />
           </div>
