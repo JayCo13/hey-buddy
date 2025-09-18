@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import voiceActivationService from '../services/voiceActivationService';
-import whisperService from '../services/whisperService';
 import greetingService from '../services/greetingService';
 import piperService from '../services/piperService';
 
@@ -206,7 +205,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         const voiceActivationSuccess = await voiceActivationService.initialize();
         
         if (!voiceActivationSuccess) {
-          throw new Error('Voice activation service initialization failed');
+          console.error('Voice activation service initialization failed');
+          setError('Voice activation service initialization failed');
+          return; // Don't throw error, just set error state and continue
         }
         
         // Set up callbacks for voice activation
@@ -216,11 +217,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         voiceActivationService.setStatusCallback(handleStatusChange);
         
         console.log('Voice activation service initialized successfully');
-        
-        // Initialize whisper service for speech recognition
-        console.log('Initializing whisper service...');
-        await whisperService.initialize();
-        console.log('Whisper service initialized');
         
         // ULTRA-FAST INITIALIZATION
         console.log('Initializing TTS...');
@@ -251,6 +247,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           setError(`Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.`);
         } else {
           setError(`Voice activation initialization error: ${err.message}`);
+        }
+        
+        // Check if Web Speech API fallback is available
+        const status = voiceActivationService.getStatus();
+        if (status.useWebSpeechFallback) {
+          console.log('Web Speech API fallback is active, clearing error state');
+          setError(null); // Clear error if fallback is working
         }
         
         initializationStartedRef.current = false; // Reset on error

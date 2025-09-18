@@ -74,16 +74,19 @@ The voice activation service now returns a status object that includes:
 - Then: `"Whisper model initialized successfully with Transformers.js"`
 - Voice activation will work with optimized Whisper functionality
 - Processing will be slower but more memory-efficient
+- Status shows: "Ready to listen" or "🎤 Listening..."
 
 ### If WASM Fails and Switches to Web Speech API:
 - You'll see: `"Memory error detected on mobile device, attempting Web Speech API fallback..."`
 - Then: `"Web Speech API fallback voice activation initialized successfully"`
 - Voice activation will work using Web Speech API (same as RecordScreen)
-- The `useWebSpeechFallback` status will be `true`
+- Status shows: "Ready to listen (Web Speech API)" or "🎤 Listening (Web Speech API)..."
+- Green indicator appears: "✅ Using Web Speech API (same as RecordScreen)"
 
 ### Both Systems Work:
 - Say "Hey Buddy" and the app will navigate to the RecordScreen
 - The RecordScreen will work perfectly with Web Speech API (as shown in your image)
+- No more "Voice activation requires more memory" error on the main page
 
 ## Troubleshooting
 
