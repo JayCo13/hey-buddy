@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ProfileScreen from './ProfileScreen';
 import MobileMicrophonePermission from './MobileMicrophonePermission';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import { Signal, Wifi, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
@@ -12,6 +13,7 @@ const MainScreen = ({ onNavigate }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
   const [showMicrophonePermission, setShowMicrophonePermission] = useState(false);
+  const [useWebSpeechAPI, setUseWebSpeechAPI] = useState(false);
   
   // Voice activation context
   const {
@@ -24,6 +26,29 @@ const MainScreen = ({ onNavigate }) => {
     greetingInitialized,
     triggerGreetingSpeech
   } = useVoiceActivation();
+
+  // Web Speech API for mobile fallback
+  const { 
+    isListening: webSpeechListening, 
+    transcript: webSpeechTranscript, 
+    isSupported: webSpeechSupported, 
+    startListening: startWebSpeechListening, 
+    stopListening: stopWebSpeechListening, 
+    resetTranscript: resetWebSpeechTranscript 
+  } = useSpeechRecognition({
+    continuous: true,
+    interimResults: true,
+    lang: "en-US",
+    onResult: (text, isFinal) => {
+      if (isFinal && text.toLowerCase().includes('hey buddy')) {
+        console.log('🎤 Web Speech API detected "Hey Buddy"!');
+        handleWakeWordDetected('Hey Buddy', text);
+      }
+    },
+    onError: (error) => {
+      console.error("Web Speech API error:", error);
+    }
+  });
 
   const trendingVoices = [
     { id: 1, avatar: '👩‍🦳', duration: '0:08', isPlaying: false },
@@ -45,6 +70,13 @@ const MainScreen = ({ onNavigate }) => {
     }
   };
 
+  // Handle wake word detection
+  const handleWakeWordDetected = (wakeWord, transcription) => {
+    console.log('🎤 Wake word detected:', wakeWord, transcription);
+    // Navigate to record screen when wake word is detected
+    onNavigate('record');
+  };
+
   // Enable speech on first user interaction
   const enableSpeech = async () => {
     if (!speechEnabled) {
@@ -55,6 +87,23 @@ const MainScreen = ({ onNavigate }) => {
       await triggerGreetingSpeech();
     }
   };
+
+  // Check if we should use Web Speech API fallback
+  useEffect(() => {
+    // If WASM voice activation fails with memory error, switch to Web Speech API
+    if (error && (error.includes('memory') || error.includes('Memory')) && webSpeechSupported) {
+      console.log('🔄 Switching to Web Speech API due to WASM memory error');
+      setUseWebSpeechAPI(true);
+    }
+  }, [error, webSpeechSupported]);
+
+  // Start Web Speech API listening when enabled
+  useEffect(() => {
+    if (useWebSpeechAPI && webSpeechSupported && speechEnabled && !webSpeechListening) {
+      console.log('🎤 Starting Web Speech API listening...');
+      startWebSpeechListening();
+    }
+  }, [useWebSpeechAPI, webSpeechSupported, speechEnabled, webSpeechListening, startWebSpeechListening]);
 
   // Check microphone permission on load
   useEffect(() => {
@@ -285,12 +334,38 @@ const MainScreen = ({ onNavigate }) => {
                 Say "Hey Buddy" to start recording
               </p>
               
+              {/* Manual toggle for testing */}
+              {webSpeechSupported && (
+                <div className="mb-4">
+                  <button
+                    onClick={() => {
+                      if (useWebSpeechAPI) {
+                        setUseWebSpeechAPI(false);
+                        stopWebSpeechListening();
+                      } else {
+                        setUseWebSpeechAPI(true);
+                        startWebSpeechListening();
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs transition-colors ${
+                      useWebSpeechAPI 
+                        ? 'bg-green-600 hover:bg-green-700 text-white' 
+                        : 'bg-gray-600 hover:bg-gray-500 text-gray-200'
+                    }`}
+                  >
+                    {useWebSpeechAPI ? 'Using Web Speech API' : 'Switch to Web Speech API'}
+                  </button>
+                </div>
+              )}
+              
               {/* Ultra-smooth audio level indicator */}
-              {isInitialized && (
+              {(isInitialized || useWebSpeechAPI) && (
                 <div className="mb-4">
                   <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden">
                     <div 
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-100 ease-out"
+                      className={`h-2 rounded-full transition-all duration-100 ease-out ${
+                        useWebSpeechAPI ? 'bg-green-500' : 'bg-blue-500'
+                      }`}
                       style={{ 
                         width: `${Math.min(Math.max(audioLevel * 100, 5), 100)}%`,
                         transform: 'translateZ(0)', // Hardware acceleration
@@ -301,8 +376,8 @@ const MainScreen = ({ onNavigate }) => {
                 </div>
               )}
               
-              {/* Error indicator - only show if there's an error */}
-              {error && (
+              {/* Error indicator - only show if there's an error and not using Web Speech API */}
+              {error && !useWebSpeechAPI && (
                 <div className="mb-4 p-2 bg-red-900/20 border border-red-500/30 rounded-lg">
                   <p className="text-red-400 text-xs">{error}</p>
                 </div>
@@ -310,7 +385,13 @@ const MainScreen = ({ onNavigate }) => {
               
               {/* Simple status indicator */}
               <div className="text-center">
-                {!isInitialized ? (
+                {useWebSpeechAPI ? (
+                  webSpeechListening ? (
+                    <div className="text-green-400 text-sm">🎤 Listening (Web Speech API)...</div>
+                  ) : (
+                    <div className="text-green-400 text-sm">Ready to listen (Web Speech API)</div>
+                  )
+                ) : !isInitialized ? (
                   <div className="text-gray-400 text-sm">Initializing voice activation...</div>
                 ) : isListening ? (
                   <div className="text-blue-400 text-sm">🎤 Listening...</div>
