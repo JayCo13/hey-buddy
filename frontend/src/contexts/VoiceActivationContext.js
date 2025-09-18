@@ -117,8 +117,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       const deviceInfo = deviceDetection.getOptimizedSettings();
       let greetingServiceToUse;
       
-      if (deviceInfo.fallbackMode || !deviceInfo.useAIModels) {
-        console.log('Using mobile greeting service');
+      if (deviceInfo.fallbackMode || !deviceInfo.useAIModels || !deviceDetection.canHandleAIModels()) {
+        console.log('Using mobile greeting service (device cannot handle AI models)');
         greetingServiceToUse = mobileGreetingService;
       } else {
         console.log('Using full greeting service');
@@ -294,6 +294,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             console.log('Whisper service initialized');
           } catch (error) {
             console.warn('Whisper service failed, continuing without it:', error);
+            // If Whisper fails, switch to mobile mode
+            console.log('Switching to mobile mode due to Whisper failure');
+            setIsMobileMode(true);
+            setVoiceService(mobileVoiceService);
           }
         } else {
           console.log('Skipping whisper service initialization (mobile mode)');
@@ -435,6 +439,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     try {
       console.log('Starting real-time detection...');
+      
+      // Ensure transcription service is set for voice activation service
+      if (!isMobileMode && voiceService === voiceActivationService) {
+        if (!voiceService.hasTranscriptionService()) {
+          console.log('Setting transcription service...');
+          voiceService.setTranscriptionService(whisperService);
+        }
+      }
       
       // Use the selected voice service for real-time detection
       let success;
