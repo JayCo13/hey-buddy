@@ -1,8 +1,9 @@
 /**
  * Voice Activation Service
- * Handles microphone access, audio processing, and wake word detection
- * Can use either Whisper or mobile voice service for transcription
+ * Handles microphone access, audio processing, and wake word detection using Whisper
  */
+
+import whisperService from './whisperService';
 
 class VoiceActivationService {
   constructor() {
@@ -16,29 +17,12 @@ class VoiceActivationService {
     this.audioChunks = [];
     this.processingInterval = null;
     this.wakeWord = 'hey buddy';
-    this.transcriptionService = null; // Will be set to whisperService or mobileVoiceService
     this.callbacks = {
       onWakeWordDetected: null,
       onAudioLevelChange: null,
       onError: null,
       onStatusChange: null
     };
-  }
-
-  /**
-   * Set the transcription service to use
-   * @param {Object} service - The transcription service (whisperService or mobileVoiceService)
-   */
-  setTranscriptionService(service) {
-    this.transcriptionService = service;
-    console.log('Transcription service set:', service.constructor.name);
-  }
-
-  /**
-   * Check if transcription service is available
-   */
-  hasTranscriptionService() {
-    return this.transcriptionService !== null;
   }
 
   /**
@@ -263,38 +247,18 @@ class VoiceActivationService {
         throw new Error('No media stream available. Call initialize() first.');
       }
 
-      // Create MediaRecorder with mobile-compatible settings
-      let options = {};
+      // Create MediaRecorder for continuous recording with optimized settings
+      const options = {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 128000 // Higher quality for better speech recognition
+      };
       
-      // Try different formats in order of preference
-      const formats = [
-        'audio/webm;codecs=opus',
-        'audio/webm',
-        'audio/mp4',
-        'audio/ogg;codecs=opus',
-        'audio/wav'
-      ];
-      
-      for (const format of formats) {
-        if (MediaRecorder.isTypeSupported(format)) {
-          options.mimeType = format;
-          break;
-        }
+      // Fallback to default if the preferred format isn't supported
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'audio/webm';
       }
       
-      // If no specific format is supported, use default
-      if (!options.mimeType) {
-        console.warn('No specific audio format supported, using default');
-        options = {};
-      }
-      
-      try {
-        this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
-      } catch (error) {
-        console.error('Failed to create MediaRecorder with options:', error);
-        // Fallback to default MediaRecorder
-        this.mediaRecorder = new MediaRecorder(this.mediaStream);
-      }
+      this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
 
       this.audioChunks = [];
 
@@ -317,24 +281,9 @@ class VoiceActivationService {
       
       // Process audio every 1 second for faster wake word detection
       this.processingInterval = setInterval(() => {
-        if (this.isListening && this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-          try {
-            this.mediaRecorder.stop();
-            // Small delay before restarting to prevent conflicts
-            setTimeout(() => {
-              if (this.isListening && this.mediaRecorder) {
-                try {
-                  this.mediaRecorder.start();
-                } catch (error) {
-                  console.error('Failed to restart MediaRecorder:', error);
-                  this.notifyError(`MediaRecorder restart failed: ${error.message}`);
-                }
-              }
-            }, 100);
-          } catch (error) {
-            console.error('Failed to stop MediaRecorder:', error);
-            this.notifyError(`MediaRecorder stop failed: ${error.message}`);
-          }
+        if (this.isListening && this.mediaRecorder.state === 'recording') {
+          this.mediaRecorder.stop();
+          this.mediaRecorder.start();
         }
       }, 1000);
 
@@ -503,25 +452,13 @@ class VoiceActivationService {
     
     console.log(`Audio level - RMS: ${rms.toFixed(6)}, Peak: ${peak.toFixed(6)}`); // Debug audio level
     
-      // Use the selected transcription service
-      if (!this.transcriptionService) {
-        console.warn('No transcription service available, skipping transcription');
-        return;
-      }
-      
-      // Check if the transcription service is actually initialized
-      if (this.transcriptionService.constructor.name === 'WhisperService' && !this.transcriptionService.isInitialized) {
-        console.warn('Whisper service not initialized, skipping transcription');
-        return;
-      }
-      
       // Add timeout for transcription to prevent hanging
-      const transcriptionPromise = this.transcriptionService.transcribeAudioBuffer(audioBuffer);
+      const transcriptionPromise = whisperService.transcribeAudioBuffer(audioBuffer);
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Transcription timeout after 4 seconds')), 4000)
       );
     
-    // Transcribe using selected service with timeout
+    // Transcribe using Whisper with timeout
     const transcription = await Promise.race([transcriptionPromise, timeoutPromise]);
     
     console.log('Transcription result:', transcription); // Debug log

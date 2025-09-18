@@ -41,23 +41,12 @@ class WhisperService {
       // Import Transformers.js with error handling
       let AutoProcessor, AutoModelForSpeechSeq2Seq;
       try {
-        // Try @xenova/transformers first (more stable)
-        const transformers = await import('@xenova/transformers');
+        const transformers = await import('@huggingface/transformers');
         AutoProcessor = transformers.AutoProcessor;
         AutoModelForSpeechSeq2Seq = transformers.AutoModelForSpeechSeq2Seq;
-        console.log('Using @xenova/transformers');
       } catch (importError) {
-        console.warn('Failed to import @xenova/transformers, trying @huggingface/transformers:', importError);
-        try {
-          // Fallback to @huggingface/transformers
-          const transformers = await import('@huggingface/transformers');
-          AutoProcessor = transformers.AutoProcessor;
-          AutoModelForSpeechSeq2Seq = transformers.AutoModelForSpeechSeq2Seq;
-          console.log('Using @huggingface/transformers');
-        } catch (fallbackError) {
-          console.error('Failed to import both transformers libraries:', fallbackError);
-          throw new Error('Transformers.js library failed to load. Please refresh the page.');
-        }
+        console.error('Failed to import Transformers.js:', importError);
+        throw new Error('Transformers.js library failed to load. Please refresh the page.');
       }
 
       if (onProgress) {
@@ -65,35 +54,17 @@ class WhisperService {
       }
 
       // Load processor - use tiny model for faster response
-      console.log('Loading Whisper processor...');
-      try {
-        this.processor = await AutoProcessor.from_pretrained('Xenova/whisper-tiny.en');
-        console.log('Whisper processor loaded successfully');
-      } catch (processorError) {
-        console.error('Failed to load Whisper processor:', processorError);
-        throw new Error(`Whisper processor failed to load: ${processorError.message}`);
-      }
+      this.processor = await AutoProcessor.from_pretrained('Xenova/whisper-tiny.en');
 
       if (onProgress) {
         onProgress({ stage: 'loading_model', message: 'Loading Whisper model...' });
       }
 
       // Load model - use tiny model for faster response
-      console.log('Loading Whisper model...');
-      try {
-        this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
-          dtype: 'q4', // Use q4 for faster processing
-          device: 'wasm'
-        });
-        console.log('Whisper model loaded successfully');
-      } catch (modelError) {
-        console.warn('Failed to load model with q4 dtype, trying without quantization:', modelError);
-        // Fallback: try without quantization
-        this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
-          device: 'wasm'
-        });
-        console.log('Whisper model loaded successfully (without quantization)');
-      }
+      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
+        dtype: 'q4', // Use q4 for faster processing
+        device: 'wasm'
+      });
 
       // Initialize audio context
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
