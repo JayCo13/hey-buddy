@@ -4,6 +4,9 @@ import { initializeDatabase } from './db/database';
 import SplashScreen from './components/SplashScreen';
 import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import serviceWorkerManager from './utils/serviceWorker';
+import offlineSyncManager from './utils/offlineSync';
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -18,7 +21,20 @@ function App() {
       setDbReady(success);
     };
     
+    // Initialize service worker
+    const initSW = async () => {
+      await serviceWorkerManager.register();
+      serviceWorkerManager.setupInstallPrompt();
+    };
+    
+    // Initialize offline sync
+    const initOfflineSync = () => {
+      offlineSyncManager.init();
+    };
+    
     initDB();
+    initSW();
+    initOfflineSync();
 
     // Show splash screen for 5 seconds, then intro
     const splashTimer = setTimeout(() => {
@@ -50,7 +66,12 @@ function App() {
     );
   }
 
-  return <AppNavigator />;
+  return (
+    <>
+      <AppNavigator />
+      <PWAInstallPrompt />
+    </>
+  );
 }
 
 export default App;
