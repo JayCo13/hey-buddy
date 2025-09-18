@@ -3,6 +3,13 @@
   command = "CI=false npm run build"
   publish = "build"
 
+# Service Worker - must not be redirected
+[[redirects]]
+  from = "/sw.js"
+  to = "/sw.js"
+  status = 200
+
+# SPA redirect for all other routes
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -14,6 +21,7 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
     Service-Worker-Allowed = "/"
+    Content-Type = "application/javascript"
 
 [[headers]]
   for = "/manifest.json"
@@ -37,4 +45,4 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    Permissions-Policy = "geolocation=(), microphone=(self), camera=()"

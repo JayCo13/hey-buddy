@@ -1,0 +1,25 @@
+# Service Worker headers
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Service-Worker-Allowed: /
+  Content-Type: application/javascript
+
+# Manifest headers
+/manifest.json
+  Cache-Control: public, max-age=31536000
+  Content-Type: application/manifest+json
+
+# Icon headers
+/icons/*
+  Cache-Control: public, max-age=31536000
+
+# Splash screen headers
+/splash/*
+  Cache-Control: public, max-age=31536000
+
+# Security headers for all files
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(self), camera=()
