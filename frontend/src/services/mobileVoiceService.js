@@ -308,6 +308,32 @@ class MobileVoiceService {
   }
 
   /**
+   * Check if the service is ready
+   */
+  isReady() {
+    return this.isInitialized && this.recognition;
+  }
+
+  /**
+   * Check if transcription service is available (for compatibility)
+   */
+  hasTranscriptionService() {
+    return this.isInitialized && this.isSupported;
+  }
+
+  /**
+   * Get service status
+   */
+  getStatus() {
+    return {
+      isInitialized: this.isInitialized,
+      isListening: this.isListening,
+      isReady: this.isReady(),
+      isSupported: this.isSupported
+    };
+  }
+
+  /**
    * Clean up resources
    */
   cleanup() {
@@ -316,4 +342,7 @@ class MobileVoiceService {
   }
 }
 
-export default MobileVoiceService;
+// Create singleton instance
+const mobileVoiceService = new MobileVoiceService();
+
+export default mobileVoiceService;

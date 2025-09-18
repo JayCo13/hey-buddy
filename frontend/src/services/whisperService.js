@@ -66,8 +66,13 @@ class WhisperService {
 
       // Load processor - use tiny model for faster response
       console.log('Loading Whisper processor...');
-      this.processor = await AutoProcessor.from_pretrained('Xenova/whisper-tiny.en');
-      console.log('Whisper processor loaded successfully');
+      try {
+        this.processor = await AutoProcessor.from_pretrained('Xenova/whisper-tiny.en');
+        console.log('Whisper processor loaded successfully');
+      } catch (processorError) {
+        console.error('Failed to load Whisper processor:', processorError);
+        throw new Error(`Whisper processor failed to load: ${processorError.message}`);
+      }
 
       if (onProgress) {
         onProgress({ stage: 'loading_model', message: 'Loading Whisper model...' });
@@ -75,11 +80,20 @@ class WhisperService {
 
       // Load model - use tiny model for faster response
       console.log('Loading Whisper model...');
-      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
-        dtype: 'q4', // Use q4 for faster processing
-        device: 'wasm'
-      });
-      console.log('Whisper model loaded successfully');
+      try {
+        this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
+          dtype: 'q4', // Use q4 for faster processing
+          device: 'wasm'
+        });
+        console.log('Whisper model loaded successfully');
+      } catch (modelError) {
+        console.warn('Failed to load model with q4 dtype, trying without quantization:', modelError);
+        // Fallback: try without quantization
+        this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
+          device: 'wasm'
+        });
+        console.log('Whisper model loaded successfully (without quantization)');
+      }
 
       // Initialize audio context
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
