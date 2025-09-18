@@ -30,16 +30,19 @@ class WhisperService {
     const isMobile = this.isMobileDevice();
     
     if (isMobile) {
-      console.log('Mobile device detected - using memory-optimized configuration');
+      console.log('Mobile device detected - using ultra-aggressive memory optimization');
       return {
         dtype: 'q4', // Quantized model for lower memory usage
         device: 'wasm',
-        // Mobile-specific WASM configuration
+        // Ultra-aggressive mobile WASM configuration
         wasm: {
-          initialMemory: 128 * 1024 * 1024, // 128MB initial memory (reduced from default)
-          maximumMemory: 256 * 1024 * 1024, // 256MB max memory
+          initialMemory: 64 * 1024 * 1024, // 64MB initial memory (very conservative)
+          maximumMemory: 128 * 1024 * 1024, // 128MB max memory (very conservative)
           memoryGrowth: true, // Allow memory to grow as needed
-        }
+        },
+        // Additional mobile optimizations
+        progress_callback: null, // Disable progress callbacks to save memory
+        local_files_only: false, // Allow remote loading but with minimal memory
       };
     } else {
       return {
@@ -264,22 +267,42 @@ class WhisperService {
       
       console.log(`Audio length: ${audioLengthSeconds.toFixed(2)}s, Max amplitude: ${maxVal.toFixed(4)}`);
       
-      // Prepare inputs with optimized configuration for faster processing
-      const inputs = await this.processor(audioData, {
+      // Prepare inputs with mobile-optimized configuration
+      const isMobile = this.isMobileDevice();
+      const processorConfig = isMobile ? {
+        chunk_length_s: 10, // Even shorter chunks for mobile
+        stride_length_s: 1,  // Smaller stride for mobile
+        return_tensors: 'pt'
+      } : {
         chunk_length_s: 15, // Shorter chunks for faster processing
         stride_length_s: 2,  // Smaller stride for better wake word detection
         return_tensors: 'pt'
-      });
+      };
       
-      // Generate transcription with optimized parameters for speed
-      const outputs = await this.model.generate({
+      const inputs = await this.processor(audioData, processorConfig);
+      
+      // Generate transcription with mobile-optimized parameters
+      const generateConfig = isMobile ? {
+        ...inputs,
+        max_new_tokens: 32,    // Even more reduced for mobile (wake words are short)
+        do_sample: false,
+        num_beams: 1,          // Single beam for speed
+        early_stopping: true,  // Stop early when possible
+        pad_token_id: this.processor.tokenizer.eos_token_id,
+        // Additional mobile optimizations
+        temperature: 0.0,      // Deterministic output
+        top_p: 1.0,           // No nucleus sampling
+        repetition_penalty: 1.0, // No repetition penalty
+      } : {
         ...inputs,
         max_new_tokens: 64,    // Reduced for faster processing (wake words are short)
         do_sample: false,
         num_beams: 1,          // Single beam for speed
         early_stopping: true,  // Stop early when possible
         pad_token_id: this.processor.tokenizer.eos_token_id
-      });
+      };
+      
+      const outputs = await this.model.generate(generateConfig);
 
       // Decode the output
       const transcription = this.processor.tokenizer.decode(outputs[0], {

@@ -4,7 +4,6 @@
  */
 
 import whisperService from './whisperService';
-import mobileVoiceActivationService from './mobileVoiceActivationService';
 
 class VoiceActivationService {
   constructor() {
@@ -18,7 +17,6 @@ class VoiceActivationService {
     this.audioChunks = [];
     this.processingInterval = null;
     this.wakeWord = 'hey buddy';
-    this.useMobileFallback = false;
     this.callbacks = {
       onWakeWordDetected: null,
       onAudioLevelChange: null,
@@ -69,17 +67,10 @@ class VoiceActivationService {
   }
 
   /**
-   * Initialize the voice activation service with fallback support
+   * Initialize the voice activation service with aggressive mobile optimizations
    */
   async initialize() {
     try {
-      // Try to initialize Whisper service first
-      const whisperInitialized = await whisperService.initialize();
-      
-      if (!whisperInitialized) {
-        throw new Error('Whisper service initialization failed');
-      }
-
       // Get mobile-optimized audio constraints
       const audioConstraints = this.getMobileOptimizedAudioConstraints();
       
@@ -112,10 +103,18 @@ class VoiceActivationService {
       
       this.microphone.connect(this.analyser);
 
+      // Initialize Whisper service with aggressive mobile optimizations
+      console.log('Initializing Whisper service with mobile optimizations...');
+      const whisperInitialized = await whisperService.initialize();
+      
+      if (!whisperInitialized) {
+        throw new Error('Whisper service initialization failed');
+      }
+
       this.notifyStatusChange('ready');
       return true;
     } catch (error) {
-      console.error('Primary voice activation failed:', error);
+      console.error('Voice activation initialization failed:', error);
       console.log('Error details:', {
         message: error.message,
         isMobile: this.isMobileDevice(),
@@ -123,92 +122,32 @@ class VoiceActivationService {
         errorType: error.constructor.name
       });
       
-      // Check if this is a memory-related error on mobile
-      const isMemoryError = error.message.includes('Out of memory') || 
-                           error.message.includes('RangeError') || 
-                           error.isMemoryError;
-      
-      if (this.isMobileDevice() && isMemoryError) {
-        console.log('Memory error detected on mobile device, attempting fallback...');
-        const fallbackSuccess = await this.initializeMobileFallback();
-        if (fallbackSuccess) {
-          console.log('Mobile fallback successful!');
-          return true;
-        } else {
-          console.log('Mobile fallback failed, returning original error');
-        }
-      }
-      
       this.notifyError(`Failed to initialize voice activation: ${error.message}`);
       return false;
     }
   }
 
-  /**
-   * Initialize mobile fallback voice activation service
-   * @returns {Promise<boolean>} - True if initialization successful
-   */
-  async initializeMobileFallback() {
-    try {
-      console.log('Initializing mobile fallback service...');
-      
-      // Check if mobile service is supported
-      if (!mobileVoiceActivationService.isSupported) {
-        throw new Error('Web Speech API not supported on this device');
-      }
-      
-      const success = await mobileVoiceActivationService.initialize();
-      
-      if (success) {
-        this.useMobileFallback = true;
-        
-        // Set up callbacks for mobile service
-        mobileVoiceActivationService.setWakeWordCallback(this.callbacks.onWakeWordDetected);
-        mobileVoiceActivationService.setAudioLevelCallback(this.callbacks.onAudioLevelChange);
-        mobileVoiceActivationService.setErrorCallback(this.callbacks.onError);
-        mobileVoiceActivationService.setStatusCallback(this.callbacks.onStatusChange);
-        
-        this.notifyStatusChange('ready');
-        console.log('Mobile fallback voice activation initialized successfully');
-        return true;
-      } else {
-        throw new Error('Mobile fallback initialization failed');
-      }
-    } catch (error) {
-      console.error('Mobile fallback initialization failed:', error);
-      this.notifyError(`Mobile fallback initialization failed: ${error.message}`);
-      return false;
-    }
-  }
 
   /**
-   * Start listening for wake words using Whisper or mobile fallback
+   * Start listening for wake words using Whisper
    */
   async startListening() {
-    if (this.isListening) return false;
+    if (this.isListening || !this.audioContext) return false;
 
     try {
       this.isListening = true;
       this.notifyStatusChange('listening');
       
-      if (this.useMobileFallback) {
-        // Use mobile fallback service
-        return await mobileVoiceActivationService.startListening();
-      } else {
-        // Use primary Whisper-based service
-        if (!this.audioContext) return false;
-        
-        // Resume audio context if suspended
-        if (this.audioContext.state === 'suspended') {
-          await this.audioContext.resume();
-        }
-
-        // Start audio level monitoring
-        this.startAudioLevelMonitoring();
-        
-        // Start real-time wake word detection with Whisper
-        await this.startRealTimeWakeWordDetection();
+      // Resume audio context if suspended
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
       }
+
+      // Start audio level monitoring
+      this.startAudioLevelMonitoring();
+      
+      // Start real-time wake word detection with Whisper
+      await this.startRealTimeWakeWordDetection();
       
       return true;
     } catch (error) {
@@ -224,13 +163,8 @@ class VoiceActivationService {
     this.isListening = false;
     this.isProcessing = false;
     this.notifyStatusChange('ready');
-    
-    if (this.useMobileFallback) {
-      mobileVoiceActivationService.stopListening();
-    } else {
-      this.stopAudioLevelMonitoring();
-      this.stopRealTimeWakeWordDetection();
-    }
+    this.stopAudioLevelMonitoring();
+    this.stopRealTimeWakeWordDetection();
   }
 
   /**
@@ -239,13 +173,8 @@ class VoiceActivationService {
   pauseVoiceActivation() {
     if (this.isListening) {
       console.log('Pausing voice activation for TTS playback');
-      
-      if (this.useMobileFallback) {
-        mobileVoiceActivationService.pauseVoiceActivation();
-      } else {
-        this.stopRealTimeWakeWordDetection();
-        this.stopAudioLevelMonitoring();
-      }
+      this.stopRealTimeWakeWordDetection();
+      this.stopAudioLevelMonitoring();
     }
   }
 
@@ -255,13 +184,8 @@ class VoiceActivationService {
   resumeVoiceActivation() {
     if (this.isListening) {
       console.log('Resuming voice activation after TTS playback');
-      
-      if (this.useMobileFallback) {
-        mobileVoiceActivationService.resumeVoiceActivation();
-      } else {
-        this.startAudioLevelMonitoring();
-        this.startRealTimeWakeWordDetection();
-      }
+      this.startAudioLevelMonitoring();
+      this.startRealTimeWakeWordDetection();
     }
   }
 
@@ -391,11 +315,11 @@ class VoiceActivationService {
         throw new Error('No media stream available. Call initialize() first.');
       }
 
-      // Create MediaRecorder for continuous recording with mobile-optimized settings
+      // Create MediaRecorder for continuous recording with ultra-conservative mobile settings
       const isMobile = this.isMobileDevice();
       const options = isMobile ? {
         mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 64000 // Lower bitrate for mobile to reduce memory usage
+        audioBitsPerSecond: 32000 // Ultra-low bitrate for mobile to minimize memory usage
       } : {
         mimeType: 'audio/webm;codecs=opus',
         audioBitsPerSecond: 128000 // Higher quality for desktop
@@ -410,6 +334,8 @@ class VoiceActivationService {
       if (isMobile) {
         options.videoBitsPerSecond = 0; // No video
         options.bitsPerSecond = options.audioBitsPerSecond;
+        // Ultra-conservative mobile settings
+        options.audioBitsPerSecond = Math.min(options.audioBitsPerSecond, 32000);
       }
       
       this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
@@ -433,8 +359,8 @@ class VoiceActivationService {
       // Start audio level monitoring for visual feedback
       this.startAudioLevelMonitoring();
       
-      // Process audio with mobile-optimized intervals
-      const processingInterval = this.isMobileDevice() ? 2000 : 1000; // Slower processing on mobile
+      // Process audio with ultra-conservative mobile intervals
+      const processingInterval = this.isMobileDevice() ? 3000 : 1000; // Much slower processing on mobile
       this.processingInterval = setInterval(() => {
         if (this.isListening && this.mediaRecorder.state === 'recording') {
           this.mediaRecorder.stop();
@@ -687,46 +613,31 @@ class VoiceActivationService {
   cleanup() {
     this.stopListening();
     
-    if (this.useMobileFallback) {
-      mobileVoiceActivationService.cleanup();
-    } else {
-      if (this.mediaStream) {
-        this.mediaStream.getTracks().forEach(track => track.stop());
-        this.mediaStream = null;
-      }
-      
-      if (this.audioContext) {
-        this.audioContext.close();
-        this.audioContext = null;
-      }
-      
-      this.analyser = null;
-      this.microphone = null;
-      this.mediaRecorder = null;
-      this.audioChunks = [];
+    if (this.mediaStream) {
+      this.mediaStream.getTracks().forEach(track => track.stop());
+      this.mediaStream = null;
     }
     
-    this.useMobileFallback = false;
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
+    
+    this.analyser = null;
+    this.microphone = null;
+    this.mediaRecorder = null;
+    this.audioChunks = [];
   }
 
   /**
    * Get current status
    */
   getStatus() {
-    if (this.useMobileFallback) {
-      const mobileStatus = mobileVoiceActivationService.getStatus();
-      return {
-        ...mobileStatus,
-        useMobileFallback: true
-      };
-    } else {
-      return {
-        isListening: this.isListening,
-        isProcessing: this.isProcessing,
-        isReady: !!this.audioContext,
-        useMobileFallback: false
-      };
-    }
+    return {
+      isListening: this.isListening,
+      isProcessing: this.isProcessing,
+      isReady: !!this.audioContext
+    };
   }
 }
 

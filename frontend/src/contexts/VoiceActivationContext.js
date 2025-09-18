@@ -127,25 +127,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('==================');
   };
 
-  // Test mobile fallback function
-  const testMobileFallback = async () => {
-    try {
-      console.log('Testing mobile fallback...');
-      const status = voiceActivationService.getStatus();
-      console.log('Current voice activation status:', status);
-      
-      if (status.useMobileFallback) {
-        console.log('✅ Mobile fallback is active!');
-        return true;
-      } else {
-        console.log('❌ Mobile fallback is not active');
-        return false;
-      }
-    } catch (error) {
-      console.error('Mobile fallback test failed:', error);
-      return false;
-    }
-  };
 
   // Ultra-fast greeting speech
   const speakGreeting = async (greeting) => {
@@ -417,7 +398,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Debug functions
       testSpeech,
       debugState,
-      testMobileFallback,
     
     
     // Status helpers
