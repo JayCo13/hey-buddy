@@ -509,6 +509,12 @@ class VoiceActivationService {
         return;
       }
       
+      // Check if the transcription service is actually initialized
+      if (this.transcriptionService.constructor.name === 'WhisperService' && !this.transcriptionService.isInitialized) {
+        console.warn('Whisper service not initialized, skipping transcription');
+        return;
+      }
+      
       // Add timeout for transcription to prevent hanging
       const transcriptionPromise = this.transcriptionService.transcribeAudioBuffer(audioBuffer);
       const timeoutPromise = new Promise((_, reject) => 

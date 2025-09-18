@@ -280,7 +280,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           
           // Set transcription service for voice activation service (only for full voice service)
           if (!isMobileMode && voiceService === voiceActivationService && voiceService.setTranscriptionService) {
-            voiceService.setTranscriptionService(whisperService);
+            // Only set Whisper service if it's actually initialized
+            if (whisperService.isInitialized) {
+              voiceService.setTranscriptionService(whisperService);
+              console.log('Whisper service set as transcription service');
+            } else {
+              console.warn('Whisper service not initialized, cannot set as transcription service');
+            }
           }
         }
         
@@ -293,11 +299,21 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             await whisperService.initialize();
             console.log('Whisper service initialized');
           } catch (error) {
-            console.warn('Whisper service failed, continuing without it:', error);
+            console.warn('Whisper service failed, switching to mobile mode:', error);
             // If Whisper fails, switch to mobile mode
             console.log('Switching to mobile mode due to Whisper failure');
             setIsMobileMode(true);
             setVoiceService(mobileVoiceService);
+            
+            // Re-initialize the mobile service
+            try {
+              await mobileVoiceService.initialize();
+              console.log('Mobile voice service initialized after fallback');
+            } catch (mobileError) {
+              console.error('Mobile service fallback also failed:', mobileError);
+              setError(`Voice activation unavailable: ${mobileError.message}`);
+              setStatus('error');
+            }
           }
         } else {
           console.log('Skipping whisper service initialization (mobile mode)');
@@ -443,8 +459,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Ensure transcription service is set for voice activation service
       if (!isMobileMode && voiceService === voiceActivationService) {
         if (!voiceService.hasTranscriptionService()) {
-          console.log('Setting transcription service...');
-          voiceService.setTranscriptionService(whisperService);
+          if (whisperService.isInitialized) {
+            console.log('Setting transcription service...');
+            voiceService.setTranscriptionService(whisperService);
+          } else {
+            console.warn('Whisper service not initialized, cannot set as transcription service');
+            setError('Speech recognition not available - Whisper service failed to initialize');
+            return false;
+          }
         }
       }
       
