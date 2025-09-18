@@ -5,7 +5,6 @@ import SplashScreen from './components/SplashScreen';
 import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
-import serviceWorkerManager from './utils/serviceWorker';
 import offlineSyncManager from './utils/offlineSync';
 
 function App() {
@@ -23,8 +22,8 @@ function App() {
     
     // Initialize service worker
     const initSW = async () => {
-      await serviceWorkerManager.register();
-      serviceWorkerManager.setupInstallPrompt();
+      // Service worker is now handled in index.js
+      console.log('Service worker registration handled in index.js');
     };
     
     // Initialize offline sync

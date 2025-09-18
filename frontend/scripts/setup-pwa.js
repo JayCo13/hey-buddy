@@ -49,7 +49,27 @@ function setupPwaFiles() {
     }
   });
   
-  console.log(`📋 Copied ${copiedCount}/${pwaFiles.length} PWA files`);
+  // Ensure service worker exists - create a simple one if missing
+  const swPath = path.join(buildDir, 'sw.js');
+  if (!fs.existsSync(swPath)) {
+    console.log('🔧 Creating service worker...');
+    const simpleSW = `// Hey Buddy Service Worker
+const CACHE_NAME = 'hey-buddy-v1';
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', () => self.clients.claim());
+self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));`;
+    
+    try {
+      fs.writeFileSync(swPath, simpleSW);
+      console.log('✅ Created service worker');
+      copiedCount++;
+    } catch (error) {
+      console.error('❌ Failed to create service worker:', error.message);
+      success = false;
+    }
+  }
+  
+  console.log(`📋 Copied ${copiedCount}/${pwaFiles.length + 1} PWA files`);
   
   // Check if critical files exist
   const criticalFiles = ['manifest.json', 'index.html', 'sw.js'];

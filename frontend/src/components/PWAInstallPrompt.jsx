@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { X, Download, Smartphone, Monitor } from 'lucide-react';
-import serviceWorkerManager from '../utils/serviceWorker';
 
 const PWAInstallPrompt = () => {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -9,7 +8,9 @@ const PWAInstallPrompt = () => {
 
   useEffect(() => {
     // Check if app is already installed
-    setIsInstalled(serviceWorkerManager.isAppInstalled());
+    const isAppInstalled = window.matchMedia('(display-mode: standalone)').matches ||
+                          window.navigator.standalone === true;
+    setIsInstalled(isAppInstalled);
 
     // Detect platform
     const userAgent = navigator.userAgent.toLowerCase();
@@ -22,7 +23,7 @@ const PWAInstallPrompt = () => {
     }
 
     // Show install prompt after a delay if not installed
-    if (!serviceWorkerManager.isAppInstalled()) {
+    if (!isAppInstalled) {
       const timer = setTimeout(() => {
         setShowPrompt(true);
       }, 10000); // Show after 10 seconds
@@ -33,10 +34,20 @@ const PWAInstallPrompt = () => {
 
   const handleInstall = async () => {
     try {
-      const success = await serviceWorkerManager.showInstallPrompt();
-      if (success) {
-        setShowPrompt(false);
-        setIsInstalled(true);
+      // Check if beforeinstallprompt event is available
+      if (window.deferredPrompt) {
+        window.deferredPrompt.prompt();
+        const { outcome } = await window.deferredPrompt.userChoice;
+        console.log(`User response to the install prompt: ${outcome}`);
+        window.deferredPrompt = null;
+        
+        if (outcome === 'accepted') {
+          setShowPrompt(false);
+          setIsInstalled(true);
+        }
+      } else {
+        // Fallback: show instructions
+        alert('Please use your browser\'s menu to install this app');
       }
     } catch (error) {
       console.error('Installation failed:', error);
