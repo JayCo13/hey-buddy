@@ -51,14 +51,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       
       console.log('📱 Device info:', deviceInfo);
       
-      // Determine which voice service to use
+      // Determine which voice service to use (more permissive)
       let service;
       if (deviceInfo.fallbackMode || !deviceInfo.useAIModels) {
         console.log('📱 Using mobile voice service (fallback mode)');
         service = mobileVoiceService;
         setIsMobileMode(true);
       } else {
-        console.log('🖥️ Using full voice activation service');
+        console.log('🖥️ Using full voice activation service (will try Whisper)');
         service = voiceActivationService;
         setIsMobileMode(false);
       }
@@ -292,31 +292,38 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         console.log('Voice service initialized');
         
-        // Initialize whisper service for speech recognition (only if not in mobile mode)
-        if (!isMobileMode) {
-          console.log('Initializing whisper service...');
-          try {
-            await whisperService.initialize();
-            console.log('Whisper service initialized');
-          } catch (error) {
-            console.warn('Whisper service failed, switching to mobile mode:', error);
-            // If Whisper fails, switch to mobile mode
-            console.log('Switching to mobile mode due to Whisper failure');
-            setIsMobileMode(true);
-            setVoiceService(mobileVoiceService);
-            
-            // Re-initialize the mobile service
-            try {
-              await mobileVoiceService.initialize();
-              console.log('Mobile voice service initialized after fallback');
-            } catch (mobileError) {
-              console.error('Mobile service fallback also failed:', mobileError);
-              setError(`Voice activation unavailable: ${mobileError.message}`);
-              setStatus('error');
-            }
+        // Always try to initialize whisper service first (more permissive device detection)
+        console.log('Attempting to initialize whisper service...');
+        console.log('Device info:', deviceDetection.getOptimizedSettings());
+        console.log('Can handle AI models:', deviceDetection.canHandleAIModels());
+        
+        try {
+          await whisperService.initialize();
+          console.log('✅ Whisper service initialized successfully');
+          
+          // If Whisper succeeds, ensure we're using the full voice service
+          if (voiceService !== voiceActivationService) {
+            console.log('Switching to full voice activation service');
+            setVoiceService(voiceActivationService);
+            setIsMobileMode(false);
           }
-        } else {
-          console.log('Skipping whisper service initialization (mobile mode)');
+        } catch (error) {
+          console.warn('❌ Whisper service failed, switching to mobile mode:', error);
+          
+          // If Whisper fails, switch to mobile mode
+          console.log('Switching to mobile mode due to Whisper failure');
+          setIsMobileMode(true);
+          setVoiceService(mobileVoiceService);
+          
+          // Re-initialize the mobile service
+          try {
+            await mobileVoiceService.initialize();
+            console.log('✅ Mobile voice service initialized after fallback');
+          } catch (mobileError) {
+            console.error('❌ Mobile service fallback also failed:', mobileError);
+            setError(`Voice activation unavailable: ${mobileError.message}`);
+            setStatus('error');
+          }
         }
         
         // ULTRA-FAST INITIALIZATION

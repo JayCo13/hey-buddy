@@ -36,11 +36,12 @@ class DeviceDetection {
   detectLowMemory() {
     // Check if device memory API is available
     if ('deviceMemory' in navigator) {
-      return navigator.deviceMemory <= 4; // Less than 4GB
+      return navigator.deviceMemory <= 2; // Less than 2GB (more permissive)
     }
     
-    // Fallback: assume mobile devices have limited memory
-    return this.isMobile;
+    // Fallback: don't assume mobile devices have low memory
+    // Modern mobile devices can handle Whisper
+    return false;
   }
 
   /**
@@ -67,23 +68,27 @@ class DeviceDetection {
       fallbackMode: false
     };
 
-    // Mobile devices with low memory
-    if (this.isMobile && this.isLowMemory) {
+    // Only disable AI models for very constrained devices
+    // Allow Whisper on most modern devices
+    
+    // Very old devices with very small screens
+    if (this.isMobile && window.innerWidth < 320) {
       capabilities.canLoadAIModels = false;
       capabilities.fallbackMode = true;
       capabilities.maxMemoryUsage = 'minimal';
     }
-
-    // Slow connections
-    if (this.isSlowConnection) {
+    
+    // Very slow connections (2G only)
+    if (this.isSlowConnection && navigator.connection?.effectiveType === '2g') {
       capabilities.canLoadAIModels = false;
       capabilities.fallbackMode = true;
     }
-
-    // Very old devices
-    if (this.isMobile && window.innerWidth < 400) {
+    
+    // Extremely low memory devices (less than 2GB)
+    if ('deviceMemory' in navigator && navigator.deviceMemory <= 2) {
       capabilities.canLoadAIModels = false;
       capabilities.fallbackMode = true;
+      capabilities.maxMemoryUsage = 'minimal';
     }
 
     return capabilities;
@@ -136,17 +141,21 @@ class DeviceDetection {
   canHandleAIModels() {
     // Check WebAssembly support
     if (!this.isWebAssemblySupported()) {
+      console.log('WebAssembly not supported');
       return false;
     }
 
-    // Check memory
+    // Check memory (more permissive)
     const memory = this.getMemoryEstimate();
-    if (memory && memory.limit < 100 * 1024 * 1024) { // Less than 100MB
+    if (memory && memory.limit < 50 * 1024 * 1024) { // Less than 50MB (more permissive)
+      console.log('Memory too low:', memory.limit / 1024 / 1024, 'MB');
       return false;
     }
 
     // Check device capabilities
-    return this.deviceCapabilities.canLoadAIModels;
+    const canLoad = this.deviceCapabilities.canLoadAIModels;
+    console.log('Device can load AI models:', canLoad);
+    return canLoad;
   }
 }
 
