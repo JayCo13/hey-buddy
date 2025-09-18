@@ -359,7 +359,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     setIsProcessing(false);
   };
 
-  // Real-time wake word detection using Whisper
+  // Real-time wake word detection (works with both Whisper and Web Speech API)
   const startRealTimeDetection = async () => {
     if (!isInitialized) {
       setError('Voice activation not initialized. Please wait for initialization to complete.');
@@ -368,8 +368,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     try {
       console.log('Starting real-time detection...');
-      // Use the improved voice activation service for real-time detection
-      const success = await voiceActivationService.startRealTimeWakeWordDetection();
+      // Use the unified voice activation service (works with both Whisper and Web Speech API)
+      const success = await voiceActivationService.startListening();
       if (success) {
         setIsListening(true);
         setStatus('listening');
