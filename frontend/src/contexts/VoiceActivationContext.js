@@ -123,7 +123,28 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('Piper service ready:', piperService.isReady());
     console.log('Piper service status:', piperService.getStatus());
     console.log('Greeting service status:', greetingService.getServiceStatus());
+    console.log('Voice activation status:', voiceActivationService.getStatus());
     console.log('==================');
+  };
+
+  // Test mobile fallback function
+  const testMobileFallback = async () => {
+    try {
+      console.log('Testing mobile fallback...');
+      const status = voiceActivationService.getStatus();
+      console.log('Current voice activation status:', status);
+      
+      if (status.useMobileFallback) {
+        console.log('✅ Mobile fallback is active!');
+        return true;
+      } else {
+        console.log('❌ Mobile fallback is not active');
+        return false;
+      }
+    } catch (error) {
+      console.error('Mobile fallback test failed:', error);
+      return false;
+    }
   };
 
   // Ultra-fast greeting speech
@@ -181,7 +202,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         // Initialize voice activation service
         console.log('Initializing voice activation service...');
-        await voiceActivationService.initialize();
+        const voiceActivationSuccess = await voiceActivationService.initialize();
+        
+        if (!voiceActivationSuccess) {
+          throw new Error('Voice activation service initialization failed');
+        }
         
         // Set up callbacks for voice activation
         voiceActivationService.setWakeWordCallback(handleWakeWordDetected);
@@ -189,7 +214,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         voiceActivationService.setErrorCallback(handleError);
         voiceActivationService.setStatusCallback(handleStatusChange);
         
-        console.log('Voice activation service initialized');
+        console.log('Voice activation service initialized successfully');
         
         // Initialize whisper service for speech recognition
         console.log('Initializing whisper service...');
@@ -219,7 +244,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         }
       } catch (err) {
         console.error('Voice activation initialization error:', err);
-        setError(`Voice activation initialization error: ${err.message}`);
+        
+        // Check if this is a memory-related error and provide helpful guidance
+        if (err.message.includes('memory') || err.message.includes('Memory')) {
+          setError(`Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.`);
+        } else {
+          setError(`Voice activation initialization error: ${err.message}`);
+        }
+        
         initializationStartedRef.current = false; // Reset on error
       }
     };
@@ -385,6 +417,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Debug functions
       testSpeech,
       debugState,
+      testMobileFallback,
     
     
     // Status helpers

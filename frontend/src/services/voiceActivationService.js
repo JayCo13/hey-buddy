@@ -116,11 +116,27 @@ class VoiceActivationService {
       return true;
     } catch (error) {
       console.error('Primary voice activation failed:', error);
+      console.log('Error details:', {
+        message: error.message,
+        isMobile: this.isMobileDevice(),
+        hasMemoryError: error.message.includes('Out of memory') || error.message.includes('RangeError'),
+        errorType: error.constructor.name
+      });
       
       // Check if this is a memory-related error on mobile
-      if (this.isMobileDevice() && (error.message.includes('Out of memory') || error.message.includes('RangeError'))) {
-        console.log('Attempting mobile fallback voice activation...');
-        return await this.initializeMobileFallback();
+      const isMemoryError = error.message.includes('Out of memory') || 
+                           error.message.includes('RangeError') || 
+                           error.isMemoryError;
+      
+      if (this.isMobileDevice() && isMemoryError) {
+        console.log('Memory error detected on mobile device, attempting fallback...');
+        const fallbackSuccess = await this.initializeMobileFallback();
+        if (fallbackSuccess) {
+          console.log('Mobile fallback successful!');
+          return true;
+        } else {
+          console.log('Mobile fallback failed, returning original error');
+        }
       }
       
       this.notifyError(`Failed to initialize voice activation: ${error.message}`);
@@ -134,6 +150,13 @@ class VoiceActivationService {
    */
   async initializeMobileFallback() {
     try {
+      console.log('Initializing mobile fallback service...');
+      
+      // Check if mobile service is supported
+      if (!mobileVoiceActivationService.isSupported) {
+        throw new Error('Web Speech API not supported on this device');
+      }
+      
       const success = await mobileVoiceActivationService.initialize();
       
       if (success) {

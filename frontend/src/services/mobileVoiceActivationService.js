@@ -24,7 +24,14 @@ class MobileVoiceActivationService {
    * @returns {boolean} - True if supported
    */
   checkSupport() {
-    return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+    console.log('Web Speech API support check:', {
+      webkitSpeechRecognition: 'webkitSpeechRecognition' in window,
+      SpeechRecognition: 'SpeechRecognition' in window,
+      isSupported: isSupported,
+      userAgent: navigator.userAgent
+    });
+    return isSupported;
   }
 
   /**
@@ -32,22 +39,30 @@ class MobileVoiceActivationService {
    * @returns {Promise<boolean>} - True if initialization successful
    */
   async initialize() {
+    console.log('Mobile voice activation service initialization started...');
+    
     if (!this.isSupported) {
-      throw new Error('Web Speech API not supported on this device');
+      const error = new Error('Web Speech API not supported on this device');
+      console.error('Web Speech API not supported:', error);
+      throw error;
     }
 
     try {
+      console.log('Creating SpeechRecognition instance...');
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       this.recognition = new SpeechRecognition();
       
+      console.log('Configuring recognition settings...');
       // Configure recognition for wake word detection
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
       this.recognition.lang = 'en-US';
       this.recognition.maxAlternatives = 1;
 
+      console.log('Setting up event handlers...');
       // Set up event handlers
       this.recognition.onstart = () => {
+        console.log('Mobile speech recognition started');
         this.isListening = true;
         this.notifyStatusChange('listening');
       };
@@ -62,11 +77,13 @@ class MobileVoiceActivationService {
       };
 
       this.recognition.onend = () => {
+        console.log('Mobile speech recognition ended');
         this.isListening = false;
         this.notifyStatusChange('ready');
       };
 
       this.notifyStatusChange('ready');
+      console.log('Mobile voice activation service initialized successfully');
       return true;
 
     } catch (error) {

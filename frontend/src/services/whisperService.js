@@ -128,7 +128,9 @@ class WhisperService {
       
       // Provide more specific error messages for mobile memory issues
       if (error.message.includes('Out of memory') || error.message.includes('RangeError')) {
-        throw new Error('Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.');
+        const memoryError = new Error('Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.');
+        memoryError.isMemoryError = true; // Flag for fallback detection
+        throw memoryError;
       }
       
       throw error;
