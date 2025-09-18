@@ -24,7 +24,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "react-scripts build && node scripts/copy-pwa-files.js",
+    "build:pwa": "react-scripts build && node scripts/copy-pwa-files.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
