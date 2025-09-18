@@ -1,7 +1,7 @@
 import { syncQueueService, settingsService } from './databaseService';
 
 // Backend API configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8001/api/v1' : 'https://your-backend-url.com/api/v1');
 
 class SyncService {
   constructor() {

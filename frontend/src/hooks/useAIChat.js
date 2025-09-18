@@ -23,7 +23,11 @@ export const useAIChat = () => {
       try {
         // For now, we'll use a mock response until we set up the backend API
         // This will be replaced with actual API call to hey-buddy backend
-        const response = await fetch("http://localhost:8000/api/v1/chat", {
+        const apiUrl = window.location.hostname === 'localhost' 
+          ? "http://localhost:8000/api/v1/chat" 
+          : "https://your-backend-url.com/api/v1/chat";
+        
+        const response = await fetch(apiUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
