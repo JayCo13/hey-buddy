@@ -4,6 +4,7 @@
  */
 
 import whisperService from './whisperService';
+import webSpeechVoiceActivationService from './webSpeechVoiceActivationService';
 
 class VoiceActivationService {
   constructor() {
@@ -17,6 +18,7 @@ class VoiceActivationService {
     this.audioChunks = [];
     this.processingInterval = null;
     this.wakeWord = 'hey buddy';
+    this.useWebSpeechFallback = false;
     this.callbacks = {
       onWakeWordDetected: null,
       onAudioLevelChange: null,
@@ -122,32 +124,92 @@ class VoiceActivationService {
         errorType: error.constructor.name
       });
       
+      // Check if this is a memory-related error on mobile and try Web Speech API fallback
+      const isMemoryError = error.message.includes('Out of memory') || 
+                           error.message.includes('RangeError') || 
+                           error.isMemoryError;
+      
+      if (this.isMobileDevice() && isMemoryError) {
+        console.log('Memory error detected on mobile device, attempting Web Speech API fallback...');
+        const fallbackSuccess = await this.initializeWebSpeechFallback();
+        if (fallbackSuccess) {
+          console.log('Web Speech API fallback successful!');
+          return true;
+        } else {
+          console.log('Web Speech API fallback failed, returning original error');
+        }
+      }
+      
       this.notifyError(`Failed to initialize voice activation: ${error.message}`);
       return false;
     }
   }
 
+  /**
+   * Initialize Web Speech API fallback voice activation service
+   * @returns {Promise<boolean>} - True if initialization successful
+   */
+  async initializeWebSpeechFallback() {
+    try {
+      console.log('Initializing Web Speech API fallback service...');
+      
+      // Check if Web Speech API is supported
+      if (!webSpeechVoiceActivationService.isSupported) {
+        throw new Error('Web Speech API not supported on this device');
+      }
+      
+      const success = await webSpeechVoiceActivationService.initialize();
+      
+      if (success) {
+        this.useWebSpeechFallback = true;
+        
+        // Set up callbacks for Web Speech service
+        webSpeechVoiceActivationService.setWakeWordCallback(this.callbacks.onWakeWordDetected);
+        webSpeechVoiceActivationService.setAudioLevelCallback(this.callbacks.onAudioLevelChange);
+        webSpeechVoiceActivationService.setErrorCallback(this.callbacks.onError);
+        webSpeechVoiceActivationService.setStatusCallback(this.callbacks.onStatusChange);
+        
+        this.notifyStatusChange('ready');
+        console.log('Web Speech API fallback voice activation initialized successfully');
+        return true;
+      } else {
+        throw new Error('Web Speech API fallback initialization failed');
+      }
+    } catch (error) {
+      console.error('Web Speech API fallback initialization failed:', error);
+      this.notifyError(`Web Speech API fallback initialization failed: ${error.message}`);
+      return false;
+    }
+  }
 
   /**
-   * Start listening for wake words using Whisper
+   * Start listening for wake words using Whisper or Web Speech API
    */
   async startListening() {
-    if (this.isListening || !this.audioContext) return false;
+    if (this.isListening) return false;
 
     try {
       this.isListening = true;
       this.notifyStatusChange('listening');
       
-      // Resume audio context if suspended
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+      if (this.useWebSpeechFallback) {
+        // Use Web Speech API fallback service
+        return await webSpeechVoiceActivationService.startListening();
+      } else {
+        // Use primary Whisper-based service
+        if (!this.audioContext) return false;
+        
+        // Resume audio context if suspended
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
 
-      // Start audio level monitoring
-      this.startAudioLevelMonitoring();
-      
-      // Start real-time wake word detection with Whisper
-      await this.startRealTimeWakeWordDetection();
+        // Start audio level monitoring
+        this.startAudioLevelMonitoring();
+        
+        // Start real-time wake word detection with Whisper
+        await this.startRealTimeWakeWordDetection();
+      }
       
       return true;
     } catch (error) {
@@ -163,8 +225,13 @@ class VoiceActivationService {
     this.isListening = false;
     this.isProcessing = false;
     this.notifyStatusChange('ready');
-    this.stopAudioLevelMonitoring();
-    this.stopRealTimeWakeWordDetection();
+    
+    if (this.useWebSpeechFallback) {
+      webSpeechVoiceActivationService.stopListening();
+    } else {
+      this.stopAudioLevelMonitoring();
+      this.stopRealTimeWakeWordDetection();
+    }
   }
 
   /**
@@ -173,8 +240,13 @@ class VoiceActivationService {
   pauseVoiceActivation() {
     if (this.isListening) {
       console.log('Pausing voice activation for TTS playback');
-      this.stopRealTimeWakeWordDetection();
-      this.stopAudioLevelMonitoring();
+      
+      if (this.useWebSpeechFallback) {
+        webSpeechVoiceActivationService.pauseVoiceActivation();
+      } else {
+        this.stopRealTimeWakeWordDetection();
+        this.stopAudioLevelMonitoring();
+      }
     }
   }
 
@@ -184,8 +256,13 @@ class VoiceActivationService {
   resumeVoiceActivation() {
     if (this.isListening) {
       console.log('Resuming voice activation after TTS playback');
-      this.startAudioLevelMonitoring();
-      this.startRealTimeWakeWordDetection();
+      
+      if (this.useWebSpeechFallback) {
+        webSpeechVoiceActivationService.resumeVoiceActivation();
+      } else {
+        this.startAudioLevelMonitoring();
+        this.startRealTimeWakeWordDetection();
+      }
     }
   }
 
@@ -613,31 +690,46 @@ class VoiceActivationService {
   cleanup() {
     this.stopListening();
     
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach(track => track.stop());
-      this.mediaStream = null;
+    if (this.useWebSpeechFallback) {
+      webSpeechVoiceActivationService.cleanup();
+    } else {
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach(track => track.stop());
+        this.mediaStream = null;
+      }
+      
+      if (this.audioContext) {
+        this.audioContext.close();
+        this.audioContext = null;
+      }
+      
+      this.analyser = null;
+      this.microphone = null;
+      this.mediaRecorder = null;
+      this.audioChunks = [];
     }
     
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
-    
-    this.analyser = null;
-    this.microphone = null;
-    this.mediaRecorder = null;
-    this.audioChunks = [];
+    this.useWebSpeechFallback = false;
   }
 
   /**
    * Get current status
    */
   getStatus() {
-    return {
-      isListening: this.isListening,
-      isProcessing: this.isProcessing,
-      isReady: !!this.audioContext
-    };
+    if (this.useWebSpeechFallback) {
+      const webSpeechStatus = webSpeechVoiceActivationService.getStatus();
+      return {
+        ...webSpeechStatus,
+        useWebSpeechFallback: true
+      };
+    } else {
+      return {
+        isListening: this.isListening,
+        isProcessing: this.isProcessing,
+        isReady: !!this.audioContext,
+        useWebSpeechFallback: false
+      };
+    }
   }
 }
 

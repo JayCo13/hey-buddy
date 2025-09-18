@@ -127,6 +127,26 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('==================');
   };
 
+  // Test Web Speech API fallback function
+  const testWebSpeechFallback = async () => {
+    try {
+      console.log('Testing Web Speech API fallback...');
+      const status = voiceActivationService.getStatus();
+      console.log('Current voice activation status:', status);
+      
+      if (status.useWebSpeechFallback) {
+        console.log('✅ Web Speech API fallback is active!');
+        return true;
+      } else {
+        console.log('❌ Web Speech API fallback is not active');
+        return false;
+      }
+    } catch (error) {
+      console.error('Web Speech API fallback test failed:', error);
+      return false;
+    }
+  };
+
 
   // Ultra-fast greeting speech
   const speakGreeting = async (greeting) => {
@@ -398,6 +418,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Debug functions
       testSpeech,
       debugState,
+      testWebSpeechFallback,
     
     
     // Status helpers
