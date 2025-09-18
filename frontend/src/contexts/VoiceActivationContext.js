@@ -3,6 +3,9 @@ import voiceActivationService from '../services/voiceActivationService';
 import whisperService from '../services/whisperService';
 import greetingService from '../services/greetingService';
 import piperService from '../services/piperService';
+import mobileVoiceService from '../services/mobileVoiceService';
+import mobileGreetingService from '../services/mobileGreetingService';
+import deviceDetection from '../utils/deviceDetection';
 
 const VoiceActivationContext = createContext();
 
@@ -24,6 +27,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const [wakeWordDetected, setWakeWordDetected] = useState(false);
   const [showLoading, setShowLoading] = useState(false);
   
+  // Device detection and service selection
+  const [deviceInfo, setDeviceInfo] = useState(null);
+  const [voiceService, setVoiceService] = useState(null);
+  const [isMobileMode, setIsMobileMode] = useState(false);
+  
   // Greeting system state
   const [currentGreeting, setCurrentGreeting] = useState(null);
   const [greetingInitialized, setGreetingInitialized] = useState(false);
@@ -32,32 +40,110 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const mediaRecorderRef = useRef(null);
   const isRecordingRef = useRef(false);
 
+  // Initialize device detection and voice service
+  const initializeVoiceService = async () => {
+    try {
+      console.log('🔍 Detecting device capabilities...');
+      
+      // Get device information
+      const deviceInfo = deviceDetection.getOptimizedSettings();
+      setDeviceInfo(deviceInfo);
+      
+      console.log('📱 Device info:', deviceInfo);
+      
+      // Determine which voice service to use
+      let service;
+      if (deviceInfo.fallbackMode || !deviceInfo.useAIModels) {
+        console.log('📱 Using mobile voice service (fallback mode)');
+        service = mobileVoiceService;
+        setIsMobileMode(true);
+      } else {
+        console.log('🖥️ Using full voice activation service');
+        service = voiceActivationService;
+        setIsMobileMode(false);
+      }
+      
+      setVoiceService(service);
+      
+      // Initialize the selected service
+      console.log('🚀 Initializing voice service...');
+      const success = await service.initialize();
+      
+      if (success) {
+        console.log('✅ Voice service initialized successfully');
+        setIsInitialized(true);
+        setStatus('ready');
+      } else {
+        throw new Error('Voice service initialization failed');
+      }
+      
+    } catch (error) {
+      console.error('❌ Voice service initialization failed:', error);
+      
+      // Fallback to mobile service if full service fails
+      if (!isMobileMode) {
+        console.log('🔄 Falling back to mobile voice service...');
+        try {
+          const mobileService = mobileVoiceService;
+          const mobileSuccess = await mobileService.initialize();
+          
+          if (mobileSuccess) {
+            setVoiceService(mobileService);
+            setIsMobileMode(true);
+            setIsInitialized(true);
+            setStatus('ready');
+            console.log('✅ Mobile voice service fallback successful');
+          } else {
+            throw new Error('Mobile service also failed');
+          }
+        } catch (mobileError) {
+          console.error('❌ Mobile service fallback also failed:', mobileError);
+          setError(`Voice activation unavailable: ${mobileError.message}`);
+          setStatus('error');
+        }
+      } else {
+        setError(`Voice activation unavailable: ${error.message}`);
+        setStatus('error');
+      }
+    }
+  };
+
   // Initialize greeting system (non-blocking)
   const initializeGreetingSystem = async () => {
     try {
       console.log('Initializing greeting system...');
       
-      // Initialize greeting service (non-blocking, AI loads in background)
-      const greetingServiceReady = await greetingService.initialize();
+      // Determine which greeting service to use based on device capabilities
+      const deviceInfo = deviceDetection.getOptimizedSettings();
+      let greetingServiceToUse;
+      
+      if (deviceInfo.fallbackMode || !deviceInfo.useAIModels) {
+        console.log('Using mobile greeting service');
+        greetingServiceToUse = mobileGreetingService;
+      } else {
+        console.log('Using full greeting service');
+        greetingServiceToUse = greetingService;
+      }
+      
+      // Initialize the selected greeting service
+      const greetingServiceReady = await greetingServiceToUse.initialize();
       console.log('Greeting service initialized:', greetingServiceReady);
       
-      // Generate greeting immediately (uses fallback if AI not ready)
+      // Generate greeting immediately
       console.log('Generating initial greeting...');
-      const greeting = await greetingService.generateGreeting();
+      const greeting = await greetingServiceToUse.generateGreeting();
       console.log('Generated greeting:', greeting);
       
       setCurrentGreeting(greeting);
       setGreetingInitialized(true);
       console.log('Greeting system initialized successfully');
       
-      // AI will continue loading in background and update greetings when ready
-      
     } catch (error) {
       console.error('Failed to initialize greeting system:', error);
       
       // Set a fallback greeting immediately
       const fallbackGreeting = {
-        text: `Hello ${greetingService.userName}! What can I help you with?`,
+        text: `Hello! What can I help you with?`,
         emoji: '👋',
         mood: 'neutral',
         timeOfDay: 'unknown',
@@ -179,22 +265,34 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         console.log('Greeting system initialization completed');
         debugState(); // Debug state after greeting initialization
         
-        // Initialize voice activation service
-        console.log('Initializing voice activation service...');
-        await voiceActivationService.initialize();
+        // Initialize voice service with device detection
+        console.log('Initializing voice service with device detection...');
+        await initializeVoiceService();
         
         // Set up callbacks for voice activation
-        voiceActivationService.setWakeWordCallback(handleWakeWordDetected);
-        voiceActivationService.setAudioLevelCallback(handleAudioLevelChange);
-        voiceActivationService.setErrorCallback(handleError);
-        voiceActivationService.setStatusCallback(handleStatusChange);
+        if (voiceService) {
+          voiceService.setCallbacks({
+            onWakeWordDetected: handleWakeWordDetected,
+            onAudioLevelChange: handleAudioLevelChange,
+            onError: handleError,
+            onStatusChange: handleStatusChange
+          });
+        }
         
-        console.log('Voice activation service initialized');
+        console.log('Voice service initialized');
         
-        // Initialize whisper service for speech recognition
-        console.log('Initializing whisper service...');
-        await whisperService.initialize();
-        console.log('Whisper service initialized');
+        // Initialize whisper service for speech recognition (only if not in mobile mode)
+        if (!isMobileMode) {
+          console.log('Initializing whisper service...');
+          try {
+            await whisperService.initialize();
+            console.log('Whisper service initialized');
+          } catch (error) {
+            console.warn('Whisper service failed, continuing without it:', error);
+          }
+        } else {
+          console.log('Skipping whisper service initialization (mobile mode)');
+        }
         
         // ULTRA-FAST INITIALIZATION
         console.log('Initializing TTS...');
@@ -325,15 +423,24 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
   // Real-time wake word detection using Whisper
   const startRealTimeDetection = async () => {
-    if (!isInitialized) {
+    if (!isInitialized || !voiceService) {
       setError('Voice activation not initialized. Please wait for initialization to complete.');
       return false;
     }
 
     try {
       console.log('Starting real-time detection...');
-      // Use the improved voice activation service for real-time detection
-      const success = await voiceActivationService.startRealTimeWakeWordDetection();
+      
+      // Use the selected voice service for real-time detection
+      let success;
+      if (isMobileMode) {
+        // Mobile service uses startListening method
+        success = await voiceService.startListening();
+      } else {
+        // Full service uses startRealTimeWakeWordDetection method
+        success = await voiceService.startRealTimeWakeWordDetection();
+      }
+      
       if (success) {
         setIsListening(true);
         setStatus('listening');
@@ -353,8 +460,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
   // Stop real-time detection
   const stopRealTimeDetection = () => {
-    // Use the voice activation service to stop real-time detection
-    voiceActivationService.stopListening();
+    // Use the selected voice service to stop real-time detection
+    if (voiceService) {
+      if (isMobileMode) {
+        voiceService.stopListening();
+      } else {
+        voiceService.stopRealTimeWakeWordDetection();
+      }
+    }
     setIsListening(false);
     setIsProcessing(false);
   };
@@ -369,6 +482,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     isInitialized,
     wakeWordDetected,
     showLoading,
+    
+    // Device detection state
+    deviceInfo,
+    isMobileMode,
     
     // Greeting system state
     currentGreeting,
