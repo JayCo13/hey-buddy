@@ -277,6 +277,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             onError: handleError,
             onStatusChange: handleStatusChange
           });
+          
+          // Set transcription service for voice activation service (only for full voice service)
+          if (!isMobileMode && voiceService === voiceActivationService && voiceService.setTranscriptionService) {
+            voiceService.setTranscriptionService(whisperService);
+          }
         }
         
         console.log('Voice service initialized');

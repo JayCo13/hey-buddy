@@ -1,9 +1,8 @@
 /**
  * Voice Activation Service
- * Handles microphone access, audio processing, and wake word detection using Whisper
+ * Handles microphone access, audio processing, and wake word detection
+ * Can use either Whisper or mobile voice service for transcription
  */
-
-import whisperService from './whisperService';
 
 class VoiceActivationService {
   constructor() {
@@ -17,12 +16,22 @@ class VoiceActivationService {
     this.audioChunks = [];
     this.processingInterval = null;
     this.wakeWord = 'hey buddy';
+    this.transcriptionService = null; // Will be set to whisperService or mobileVoiceService
     this.callbacks = {
       onWakeWordDetected: null,
       onAudioLevelChange: null,
       onError: null,
       onStatusChange: null
     };
+  }
+
+  /**
+   * Set the transcription service to use
+   * @param {Object} service - The transcription service (whisperService or mobileVoiceService)
+   */
+  setTranscriptionService(service) {
+    this.transcriptionService = service;
+    console.log('Transcription service set:', service.constructor.name);
   }
 
   /**
@@ -452,13 +461,18 @@ class VoiceActivationService {
     
     console.log(`Audio level - RMS: ${rms.toFixed(6)}, Peak: ${peak.toFixed(6)}`); // Debug audio level
     
+      // Use the selected transcription service
+      if (!this.transcriptionService) {
+        throw new Error('No transcription service available');
+      }
+      
       // Add timeout for transcription to prevent hanging
-      const transcriptionPromise = whisperService.transcribeAudioBuffer(audioBuffer);
+      const transcriptionPromise = this.transcriptionService.transcribeAudioBuffer(audioBuffer);
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Transcription timeout after 4 seconds')), 4000)
       );
     
-    // Transcribe using Whisper with timeout
+    // Transcribe using selected service with timeout
     const transcription = await Promise.race([transcriptionPromise, timeoutPromise]);
     
     console.log('Transcription result:', transcription); // Debug log
