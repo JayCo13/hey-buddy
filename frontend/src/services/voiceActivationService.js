@@ -4,6 +4,7 @@
  */
 
 import whisperService from './whisperService';
+import mobileVoiceActivationService from './mobileVoiceActivationService';
 
 class VoiceActivationService {
   constructor() {
@@ -17,6 +18,7 @@ class VoiceActivationService {
     this.audioChunks = [];
     this.processingInterval = null;
     this.wakeWord = 'hey buddy';
+    this.useMobileFallback = false;
     this.callbacks = {
       onWakeWordDetected: null,
       onAudioLevelChange: null,
@@ -26,60 +28,164 @@ class VoiceActivationService {
   }
 
   /**
-   * Initialize the voice activation service
+   * Detect if running on mobile device
+   * @returns {boolean} - True if mobile device
+   */
+  isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+  }
+
+  /**
+   * Get mobile-optimized audio constraints
+   * @returns {Object} - Audio constraints optimized for mobile
+   */
+  getMobileOptimizedAudioConstraints() {
+    const isMobile = this.isMobileDevice();
+    
+    if (isMobile) {
+      console.log('Mobile device detected - using optimized audio settings');
+      return {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 16000, // Match Whisper's expected sample rate
+        channelCount: 1, // Mono audio
+        latency: 0.02, // Slightly higher latency for mobile stability
+        // Mobile-specific constraints
+        sampleSize: 16, // 16-bit samples for lower memory usage
+        volume: 1.0 // Full volume
+      };
+    } else {
+      return {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 16000,
+        channelCount: 1,
+        latency: 0.01 // Lower latency for desktop
+      };
+    }
+  }
+
+  /**
+   * Initialize the voice activation service with fallback support
    */
   async initialize() {
     try {
+      // Try to initialize Whisper service first
+      const whisperInitialized = await whisperService.initialize();
+      
+      if (!whisperInitialized) {
+        throw new Error('Whisper service initialization failed');
+      }
+
+      // Get mobile-optimized audio constraints
+      const audioConstraints = this.getMobileOptimizedAudioConstraints();
+      
       // Request microphone access with optimized settings for speech
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000, // Match Whisper's expected sample rate
-          channelCount: 1, // Mono audio
-          latency: 0.01 // Low latency
-        }
+        audio: audioConstraints
       });
 
-      // Create audio context
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      // Create audio context with mobile-optimized settings
+      const audioContextOptions = this.isMobileDevice() ? {
+        sampleRate: 16000,
+        latencyHint: 'interactive' // More stable for mobile
+      } : {
+        sampleRate: 16000,
+        latencyHint: 'balanced'
+      };
+      
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)(audioContextOptions);
       this.analyser = this.audioContext.createAnalyser();
       this.microphone = this.audioContext.createMediaStreamSource(this.mediaStream);
 
-      // Configure analyser
-      this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.8;
+      // Configure analyser with mobile-optimized settings
+      if (this.isMobileDevice()) {
+        this.analyser.fftSize = 512; // Smaller FFT for mobile
+        this.analyser.smoothingTimeConstant = 0.9; // More smoothing for mobile
+      } else {
+        this.analyser.fftSize = 256;
+        this.analyser.smoothingTimeConstant = 0.8;
+      }
+      
       this.microphone.connect(this.analyser);
 
       this.notifyStatusChange('ready');
       return true;
     } catch (error) {
+      console.error('Primary voice activation failed:', error);
+      
+      // Check if this is a memory-related error on mobile
+      if (this.isMobileDevice() && (error.message.includes('Out of memory') || error.message.includes('RangeError'))) {
+        console.log('Attempting mobile fallback voice activation...');
+        return await this.initializeMobileFallback();
+      }
+      
       this.notifyError(`Failed to initialize voice activation: ${error.message}`);
       return false;
     }
   }
 
   /**
-   * Start listening for wake words using Whisper
+   * Initialize mobile fallback voice activation service
+   * @returns {Promise<boolean>} - True if initialization successful
+   */
+  async initializeMobileFallback() {
+    try {
+      const success = await mobileVoiceActivationService.initialize();
+      
+      if (success) {
+        this.useMobileFallback = true;
+        
+        // Set up callbacks for mobile service
+        mobileVoiceActivationService.setWakeWordCallback(this.callbacks.onWakeWordDetected);
+        mobileVoiceActivationService.setAudioLevelCallback(this.callbacks.onAudioLevelChange);
+        mobileVoiceActivationService.setErrorCallback(this.callbacks.onError);
+        mobileVoiceActivationService.setStatusCallback(this.callbacks.onStatusChange);
+        
+        this.notifyStatusChange('ready');
+        console.log('Mobile fallback voice activation initialized successfully');
+        return true;
+      } else {
+        throw new Error('Mobile fallback initialization failed');
+      }
+    } catch (error) {
+      console.error('Mobile fallback initialization failed:', error);
+      this.notifyError(`Mobile fallback initialization failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Start listening for wake words using Whisper or mobile fallback
    */
   async startListening() {
-    if (!this.audioContext || this.isListening) return false;
+    if (this.isListening) return false;
 
     try {
       this.isListening = true;
       this.notifyStatusChange('listening');
       
-      // Resume audio context if suspended
-      if (this.audioContext.state === 'suspended') {
-        await this.audioContext.resume();
-      }
+      if (this.useMobileFallback) {
+        // Use mobile fallback service
+        return await mobileVoiceActivationService.startListening();
+      } else {
+        // Use primary Whisper-based service
+        if (!this.audioContext) return false;
+        
+        // Resume audio context if suspended
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
 
-      // Start audio level monitoring
-      this.startAudioLevelMonitoring();
-      
-      // Start real-time wake word detection with Whisper
-      await this.startRealTimeWakeWordDetection();
+        // Start audio level monitoring
+        this.startAudioLevelMonitoring();
+        
+        // Start real-time wake word detection with Whisper
+        await this.startRealTimeWakeWordDetection();
+      }
       
       return true;
     } catch (error) {
@@ -95,8 +201,13 @@ class VoiceActivationService {
     this.isListening = false;
     this.isProcessing = false;
     this.notifyStatusChange('ready');
-    this.stopAudioLevelMonitoring();
-    this.stopRealTimeWakeWordDetection();
+    
+    if (this.useMobileFallback) {
+      mobileVoiceActivationService.stopListening();
+    } else {
+      this.stopAudioLevelMonitoring();
+      this.stopRealTimeWakeWordDetection();
+    }
   }
 
   /**
@@ -105,8 +216,13 @@ class VoiceActivationService {
   pauseVoiceActivation() {
     if (this.isListening) {
       console.log('Pausing voice activation for TTS playback');
-      this.stopRealTimeWakeWordDetection();
-      this.stopAudioLevelMonitoring();
+      
+      if (this.useMobileFallback) {
+        mobileVoiceActivationService.pauseVoiceActivation();
+      } else {
+        this.stopRealTimeWakeWordDetection();
+        this.stopAudioLevelMonitoring();
+      }
     }
   }
 
@@ -116,8 +232,13 @@ class VoiceActivationService {
   resumeVoiceActivation() {
     if (this.isListening) {
       console.log('Resuming voice activation after TTS playback');
-      this.startAudioLevelMonitoring();
-      this.startRealTimeWakeWordDetection();
+      
+      if (this.useMobileFallback) {
+        mobileVoiceActivationService.resumeVoiceActivation();
+      } else {
+        this.startAudioLevelMonitoring();
+        this.startRealTimeWakeWordDetection();
+      }
     }
   }
 
@@ -247,15 +368,25 @@ class VoiceActivationService {
         throw new Error('No media stream available. Call initialize() first.');
       }
 
-      // Create MediaRecorder for continuous recording with optimized settings
-      const options = {
+      // Create MediaRecorder for continuous recording with mobile-optimized settings
+      const isMobile = this.isMobileDevice();
+      const options = isMobile ? {
         mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000 // Higher quality for better speech recognition
+        audioBitsPerSecond: 64000 // Lower bitrate for mobile to reduce memory usage
+      } : {
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 128000 // Higher quality for desktop
       };
       
       // Fallback to default if the preferred format isn't supported
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         options.mimeType = 'audio/webm';
+      }
+      
+      // Additional mobile-specific optimizations
+      if (isMobile) {
+        options.videoBitsPerSecond = 0; // No video
+        options.bitsPerSecond = options.audioBitsPerSecond;
       }
       
       this.mediaRecorder = new MediaRecorder(this.mediaStream, options);
@@ -279,13 +410,14 @@ class VoiceActivationService {
       // Start audio level monitoring for visual feedback
       this.startAudioLevelMonitoring();
       
-      // Process audio every 1 second for faster wake word detection
+      // Process audio with mobile-optimized intervals
+      const processingInterval = this.isMobileDevice() ? 2000 : 1000; // Slower processing on mobile
       this.processingInterval = setInterval(() => {
         if (this.isListening && this.mediaRecorder.state === 'recording') {
           this.mediaRecorder.stop();
           this.mediaRecorder.start();
         }
-      }, 1000);
+      }, processingInterval);
 
       console.log('Real-time wake word detection started successfully');
       return true;
@@ -532,31 +664,46 @@ class VoiceActivationService {
   cleanup() {
     this.stopListening();
     
-    if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach(track => track.stop());
-      this.mediaStream = null;
+    if (this.useMobileFallback) {
+      mobileVoiceActivationService.cleanup();
+    } else {
+      if (this.mediaStream) {
+        this.mediaStream.getTracks().forEach(track => track.stop());
+        this.mediaStream = null;
+      }
+      
+      if (this.audioContext) {
+        this.audioContext.close();
+        this.audioContext = null;
+      }
+      
+      this.analyser = null;
+      this.microphone = null;
+      this.mediaRecorder = null;
+      this.audioChunks = [];
     }
     
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
-    
-    this.analyser = null;
-    this.microphone = null;
-    this.mediaRecorder = null;
-    this.audioChunks = [];
+    this.useMobileFallback = false;
   }
 
   /**
    * Get current status
    */
   getStatus() {
-    return {
-      isListening: this.isListening,
-      isProcessing: this.isProcessing,
-      isReady: !!this.audioContext
-    };
+    if (this.useMobileFallback) {
+      const mobileStatus = mobileVoiceActivationService.getStatus();
+      return {
+        ...mobileStatus,
+        useMobileFallback: true
+      };
+    } else {
+      return {
+        isListening: this.isListening,
+        isProcessing: this.isProcessing,
+        isReady: !!this.audioContext,
+        useMobileFallback: false
+      };
+    }
   }
 }
 

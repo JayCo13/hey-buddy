@@ -14,6 +14,48 @@ class WhisperService {
   }
 
   /**
+   * Detect if running on mobile device
+   * @returns {boolean} - True if mobile device
+   */
+  isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+  }
+
+  /**
+   * Get memory-optimized configuration for mobile devices
+   * @returns {Object} - Configuration object
+   */
+  getMemoryOptimizedConfig() {
+    const isMobile = this.isMobileDevice();
+    
+    if (isMobile) {
+      console.log('Mobile device detected - using memory-optimized configuration');
+      return {
+        dtype: 'q4', // Quantized model for lower memory usage
+        device: 'wasm',
+        // Mobile-specific WASM configuration
+        wasm: {
+          initialMemory: 128 * 1024 * 1024, // 128MB initial memory (reduced from default)
+          maximumMemory: 256 * 1024 * 1024, // 256MB max memory
+          memoryGrowth: true, // Allow memory to grow as needed
+        }
+      };
+    } else {
+      return {
+        dtype: 'q4',
+        device: 'wasm',
+        // Desktop configuration with more memory
+        wasm: {
+          initialMemory: 256 * 1024 * 1024, // 256MB initial memory
+          maximumMemory: 512 * 1024 * 1024, // 512MB max memory
+          memoryGrowth: true,
+        }
+      };
+    }
+  }
+
+  /**
    * Initialize the Whisper model using Transformers.js
    * @param {Function} onProgress - Progress callback for model loading
    * @returns {Promise<boolean>} - True if initialization successful
@@ -60,11 +102,11 @@ class WhisperService {
         onProgress({ stage: 'loading_model', message: 'Loading Whisper model...' });
       }
 
-      // Load model - use tiny model for faster response
-      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
-        dtype: 'q4', // Use q4 for faster processing
-        device: 'wasm'
-      });
+      // Get memory-optimized configuration
+      const config = this.getMemoryOptimizedConfig();
+      
+      // Load model with memory-optimized configuration
+      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', config);
 
       // Initialize audio context
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -83,6 +125,12 @@ class WhisperService {
     } catch (error) {
       console.error('Failed to initialize Whisper model:', error);
       this.isInitialized = false;
+      
+      // Provide more specific error messages for mobile memory issues
+      if (error.message.includes('Out of memory') || error.message.includes('RangeError')) {
+        throw new Error('Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.');
+      }
+      
       throw error;
     } finally {
       this.isLoading = false;
