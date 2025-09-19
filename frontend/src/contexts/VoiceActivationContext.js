@@ -90,7 +90,12 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           setTimeout(() => {
             if (!isListening) {
               console.log('🎤 Auto-starting hands-free listening...');
-              startListening();
+              // Use direct function call instead of dependency
+              if (useFallbackMode) {
+                startFallbackListening();
+              } else {
+                voiceActivationService.startListening();
+              }
             }
           }, 2000); // Wait 2 seconds after greeting to start listening
         };
@@ -100,7 +105,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
     }
-  }, [useFallbackMode, isListening, startListening]);
+  }, [useFallbackMode, isListening]);
 
   // Handle wake word detection
   const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
@@ -402,10 +407,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       console.log('🎤 Greeting completed, auto-starting voice listening...');
       // Start listening automatically after greeting
       setTimeout(() => {
-        startListening();
+        if (useFallbackMode) {
+          startFallbackListening();
+        } else {
+          voiceActivationService.startListening();
+        }
       }, 2000); // Wait 2 seconds after greeting to start listening
     }
-  }, [greetingInitialized, isInitialized, isListening, startListening]);
+  }, [greetingInitialized, isInitialized, isListening, useFallbackMode]);
 
   const value = {
     isListening,
