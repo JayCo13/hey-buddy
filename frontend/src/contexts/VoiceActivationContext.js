@@ -194,8 +194,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           console.error('🎤 onNavigateToRecord not available!');
         }
         
-        // Trigger greeting speech
-        triggerGreetingSpeech();
+        // Don't trigger greeting speech again - it was already played on page load
+        console.log('🎤 Wake word detected, navigation triggered');
       }
     };
 
@@ -236,7 +236,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     
     // Store for cleanup
     window.fallbackRecognition = recognition;
-  }, [isListening, onNavigateToRecord, triggerGreetingSpeech]);
+  }, [isListening, onNavigateToRecord]);
 
   // Assign function to ref
   startFallbackListeningRef.current = startFallbackListening;
@@ -339,8 +339,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         onNavigateToRecord();
       }
       
-      // Trigger greeting speech
-      triggerGreetingSpeech();
+      // Don't trigger greeting speech again - it was already played on page load
+      console.log('🎤 Wake word detected, navigation triggered');
     });
 
     voiceActivationService.setAudioLevelCallback((level) => {
@@ -360,7 +360,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setIsListening(false);
       }
     });
-  }, [onNavigateToRecord, triggerGreetingSpeech]);
+  }, [onNavigateToRecord]);
 
   // Initialize voice activation with fallback support
   const initializeVoiceActivation = useCallback(async () => {
@@ -461,7 +461,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     };
   }, [initializeVoiceActivation, useFallbackMode]);
 
-  // Trigger immediate greeting when initialized
+  // Trigger immediate greeting when initialized (only once)
   useEffect(() => {
     if (isInitialized && !greetingInitialized) {
       console.log('🎤 Voice activation initialized, triggering immediate greeting...');

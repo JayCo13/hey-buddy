@@ -50,10 +50,13 @@ const MainScreen = ({ onNavigate }) => {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Trigger greeting speech now that user has interacted (mobile TTS requirement)
-      await triggerGreetingSpeech();
+      // Only trigger greeting on mobile if it hasn't been played yet
+      if (useFallbackMode && !greetingInitialized) {
+        console.log('🎤 Mobile: Triggering greeting after user interaction');
+        await triggerGreetingSpeech();
+      }
     }
-  }, [speechEnabled, triggerGreetingSpeech]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
