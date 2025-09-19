@@ -61,10 +61,22 @@ class WhisperService {
       }
 
       // Load model - use tiny model for faster response
-      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
-        dtype: 'q4', // Use q4 for faster processing
-        device: 'wasm'
-      });
+      // Try with memory-optimized settings first
+      try {
+        this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
+          dtype: 'q4', // Use q4 for faster processing
+          device: 'wasm',
+          // Add memory optimization options
+          low_cpu_mem_usage: true,
+          torch_dtype: 'q4'
+        });
+      } catch (memoryError) {
+        console.warn('Memory-optimized model failed, trying basic settings:', memoryError);
+        // Fallback to basic settings if memory-optimized fails
+        this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
+          device: 'wasm'
+        });
+      }
 
       // Initialize audio context
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -83,6 +95,14 @@ class WhisperService {
     } catch (error) {
       console.error('Failed to initialize Whisper model:', error);
       this.isInitialized = false;
+      
+      // Check if it's a memory-related error
+      if (error.message.includes('Out of memory') || 
+          error.message.includes('RangeError') ||
+          error.message.includes('no available backend')) {
+        throw new Error('no available backend found. ERR: [wasm] RangeError: Out of memory');
+      }
+      
       throw error;
     } finally {
       this.isLoading = false;

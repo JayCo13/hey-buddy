@@ -22,7 +22,11 @@ const MainScreen = ({ onNavigate }) => {
     showLoading,
     currentGreeting,
     greetingInitialized,
-    triggerGreetingSpeech
+    triggerGreetingSpeech,
+    useFallbackMode,
+    deviceCapabilities,
+    startListening,
+    stopListening
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -301,10 +305,35 @@ const MainScreen = ({ onNavigate }) => {
                 </div>
               )}
               
-              {/* Error indicator - only show if there's an error */}
+              {/* Error indicator - show mobile-friendly messages */}
               {error && (
-                <div className="mb-4 p-2 bg-red-900/20 border border-red-500/30 rounded-lg">
-                  <p className="text-red-400 text-xs">{error}</p>
+                <div className="mb-4 p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+                  <div className="flex items-start space-x-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-red-400 text-xs">
+                      {error.includes('no available backend') || error.includes('Out of memory') ? (
+                        <div>
+                          <p className="font-medium mb-1">Mobile Voice Mode Active</p>
+                          <p>Using simplified voice recognition for better mobile performance.</p>
+                          <p className="mt-1 text-red-300">Tap the microphone to start listening.</p>
+                        </div>
+                      ) : (
+                        <p>{error}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Mobile fallback mode indicator */}
+              {useFallbackMode && !error && (
+                <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <p className="text-blue-400 text-xs">
+                      Mobile-optimized voice mode • Tap microphone to activate
+                    </p>
+                  </div>
                 </div>
               )}
               
@@ -318,6 +347,28 @@ const MainScreen = ({ onNavigate }) => {
                   <div className="text-gray-400 text-sm">Ready to listen</div>
                 )}
               </div>
+              
+              {/* Mobile microphone button */}
+              {useFallbackMode && isInitialized && (
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={async () => {
+                      if (isListening) {
+                        stopListening();
+                      } else {
+                        await startListening();
+                      }
+                    }}
+                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
+                      isListening 
+                        ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25' 
+                        : 'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/25'
+                    }`}
+                  >
+                    <Mic className={`w-8 h-8 text-white ${isListening ? 'animate-pulse' : ''}`} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

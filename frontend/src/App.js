@@ -6,6 +6,7 @@ import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import offlineSyncManager from './utils/offlineSync';
+import { VoiceActivationProvider } from './contexts/VoiceActivationContext';
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
@@ -66,10 +67,10 @@ function App() {
   }
 
   return (
-    <>
+    <VoiceActivationProvider>
       <AppNavigator />
       <PWAInstallPrompt />
-    </>
+    </VoiceActivationProvider>
   );
 }
 
