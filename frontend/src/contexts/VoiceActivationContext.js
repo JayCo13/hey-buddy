@@ -83,7 +83,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           // Resume voice activation after TTS
           if (useFallbackMode) {
             setTimeout(() => {
-              startFallbackListening();
+              // Restart fallback listening
+              if (window.fallbackRecognition) {
+                window.fallbackRecognition.start();
+              }
             }, 1000);
           } else {
             voiceActivationService.resumeVoiceActivation();
@@ -95,7 +98,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
     }
-  }, [useFallbackMode, startFallbackListening]);
+  }, [useFallbackMode]);
 
   // Handle wake word detection
   const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
