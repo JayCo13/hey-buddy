@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ProfileScreen from './ProfileScreen';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
-import { Signal, Wifi, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
+import { Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
 
@@ -162,20 +162,6 @@ const MainScreen = ({ onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-
-      {/* Status Bar */}
-      <div className="flex justify-between items-center px-6 py-2 text-sm">
-        <span className="font-medium">9:41</span>
-        <div className="flex items-center space-x-1">
-          <div className="flex space-x-1">
-            <Signal className="w-3 h-3 text-gray-300" />
-          </div>
-          <Wifi className="w-4 h-4 text-gray-300" />
-          <div className="w-6 h-3 border border-gray-300 rounded-sm">
-            <div className="w-4 h-2 bg-gray-300 rounded-sm m-0.5"></div>
-          </div>
-        </div>
-      </div>
 
       {/* App Header */}
       <div className="flex items-center justify-between px-6 py-4">

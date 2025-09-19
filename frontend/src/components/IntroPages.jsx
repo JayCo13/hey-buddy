@@ -4,13 +4,12 @@ import screen1Animation from '../screen1.json';
 import screen2Animation from '../screen2.json';
 import screen3Animation from '../screen3.json';
 import screen4Animation from '../screen4.json';
-import { Signal, Wifi, Battery, CloudCheck, Smartphone, Sun, Calendar, ArrowRight, CheckCircle, Shield, Zap, Users, BarChart3, Brain, Cpu, Network, Sparkles } from 'lucide-react';
+import { CloudCheck, Smartphone, Sun, Calendar, ArrowRight, CheckCircle, Shield, Zap, Users, BarChart3, Brain, Cpu, Network, Sparkles } from 'lucide-react';
 import ShinyText from '../effects/ShinyText';
 import GradientText from '../effects/GradientText'
 
 const IntroPages = ({ onComplete }) => {
   const [currentPage, setCurrentPage] = useState(0);
-  const [currentTime, setCurrentTime] = useState('9:41');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [elementsVisible, setElementsVisible] = useState(false);
 
@@ -151,20 +150,6 @@ const IntroPages = ({ onComplete }) => {
     return () => document.head.removeChild(style);
   }, []);
 
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const timeString = `${hours}:${minutes.toString().padStart(2, '0')}`;
-      setCurrentTime(timeString);
-    };
-
-    updateTime();
-    const interval = setInterval(updateTime, 60000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Handle element visibility animations
   useEffect(() => {
@@ -310,18 +295,6 @@ const IntroPages = ({ onComplete }) => {
         <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-gray-400 rounded-full animate-bounce opacity-30" style={{ animationDelay: '0.5s' }}></div>
         <div className="absolute top-1/2 right-1/4 w-1 h-1 bg-gray-300 rounded-full animate-bounce opacity-25" style={{ animationDelay: '1s' }}></div>
         <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-gray-400 rounded-full animate-bounce opacity-30" style={{ animationDelay: '2s' }}></div>
-      </div>
-
-      {/* Dark Header */}
-      <div className="flex justify-between items-center px-4 py-2 text-white text-sm relative z-10">
-        <span className="font-semibold">{currentTime}</span>
-        <div className="flex items-center space-x-2">
-          <Signal className="w-4 h-4 text-gray-300" />
-          <Wifi className="w-4 h-4 text-gray-300" />
-          <div className="w-8 h-4 border border-gray-300 rounded-sm">
-            <div className="w-6 h-2 bg-gray-300 rounded-sm m-0.5"></div>
-          </div>
-        </div>
       </div>
 
       {/* Main Content */}

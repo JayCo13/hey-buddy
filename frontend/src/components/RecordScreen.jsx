@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Signal, Wifi, Mic, Play, Pause, Home, User, Volume2, VolumeX } from 'lucide-react';
+import { Mic, Play, Pause, Home, User, Volume2, VolumeX } from 'lucide-react';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import { useAIChat } from '../hooks/useAIChat';
 
@@ -156,20 +156,6 @@ const RecordScreen = ({ onNavigate }) => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Status Bar */}
-      <div className="flex justify-between items-center px-6 py-2 text-sm">
-        <span className="font-medium">9:41</span>
-        <div className="flex items-center space-x-1">
-          <div className="flex space-x-1">
-            <Signal className="w-3 h-3 text-gray-300" />
-          </div>
-          <Wifi className="w-4 h-4 text-gray-300" />
-          <div className="w-6 h-3 border border-gray-300 rounded-sm">
-            <div className="w-4 h-2 bg-gray-300 rounded-sm m-0.5"></div>
-          </div>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="px-6 py-4">
         <h1 className="text-2xl font-bold">Record Audio</h1>

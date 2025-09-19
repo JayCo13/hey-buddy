@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
-import { Signal, Wifi, Battery, ArrowLeft, Edit3, Mail, Phone, Calendar, Home, Mic, User } from 'lucide-react';
+import { ArrowLeft, Edit3, Mail, Phone, Calendar, Home, Mic, User } from 'lucide-react';
 
 const ProfileScreen = ({ onBack, onNavigate }) => {
   const [profileData, setProfileData] = useState({
@@ -82,20 +82,6 @@ const ProfileScreen = ({ onBack, onNavigate }) => {
         <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }}></div>
         <div className="absolute top-1/2 right-1/3 w-20 h-20 bg-cyan-500/5 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }}></div>
       </div>
-      {/* Status Bar */}
-      <div className="flex justify-between items-center px-6 py-2 text-sm relative z-10">
-        <span className="font-medium">9:41</span>
-        <div className="flex items-center space-x-1">
-          <div className="flex space-x-1">
-            <Signal className="w-3 h-3 text-gray-300" />
-          </div>
-          <Wifi className="w-4 h-4 text-gray-300" />
-          <div className="w-6 h-3 border border-gray-300 rounded-sm">
-            <div className="w-4 h-2 bg-gray-300 rounded-sm m-0.5"></div>
-          </div>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 relative z-10">
         <button
