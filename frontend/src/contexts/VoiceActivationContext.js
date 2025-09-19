@@ -40,8 +40,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     // Check for memory constraints that might cause WASM issues
     const hasLowMemory = memoryInfo < 4 || isMobile;
     
-    console.log('🔍 Device detection:', { isMobile, memoryInfo, supportsWASM, hasLowMemory });
-    
     setDeviceCapabilities({
       supportsWASM,
       memoryLimit: memoryInfo,
@@ -95,17 +93,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           setTimeout(() => {
             console.log('🎤 Auto-starting hands-free listening...');
             if (useFallbackMode) {
-              if (startFallbackListeningRef.current) {
-                  if (startFallbackListeningRef.current) {
               startFallbackListeningRef.current();
-            } else {
-              console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-              startFallbackListening();
-            }
-              } else {
-                console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-                startFallbackListening();
-              }
             } else {
               voiceActivationService.startListening();
             }
@@ -119,17 +107,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           setTimeout(() => {
             console.log('🎤 Starting listening after TTS error...');
             if (useFallbackMode) {
-              if (startFallbackListeningRef.current) {
-                  if (startFallbackListeningRef.current) {
               startFallbackListeningRef.current();
-            } else {
-              console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-              startFallbackListening();
-            }
-              } else {
-                console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-                startFallbackListening();
-              }
             } else {
               voiceActivationService.startListening();
             }
@@ -145,17 +123,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           setTimeout(() => {
             console.log('🎤 Starting listening after TTS failure...');
             if (useFallbackMode) {
-              if (startFallbackListeningRef.current) {
-                  if (startFallbackListeningRef.current) {
               startFallbackListeningRef.current();
-            } else {
-              console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-              startFallbackListening();
-            }
-              } else {
-                console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-                startFallbackListening();
-              }
             } else {
               voiceActivationService.startListening();
             }
@@ -167,12 +135,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setTimeout(() => {
           console.log('🎤 Starting listening (no TTS)...');
           if (useFallbackMode) {
-              if (startFallbackListeningRef.current) {
-              startFallbackListeningRef.current();
-            } else {
-              console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-              startFallbackListening();
-            }
+            startFallbackListeningRef.current();
           } else {
             voiceActivationService.startListening();
           }
@@ -231,8 +194,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           console.error('🎤 onNavigateToRecord not available!');
         }
         
-        // Don't trigger greeting speech again - it was already played on page load
-        console.log('🎤 Wake word detected, navigation triggered');
+        // Trigger greeting speech
+        triggerGreetingSpeech();
       }
     };
 
@@ -273,12 +236,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     
     // Store for cleanup
     window.fallbackRecognition = recognition;
-  }, [isListening, onNavigateToRecord]);
+  }, [isListening, onNavigateToRecord, triggerGreetingSpeech]);
 
-  // Assign function to ref in useEffect to ensure it's properly set
-  useEffect(() => {
-    startFallbackListeningRef.current = startFallbackListening;
-  }, [startFallbackListening]);
+  // Assign function to ref
+  startFallbackListeningRef.current = startFallbackListening;
 
   // Start audio level monitoring for fallback mode
   const startFallbackAudioLevelMonitoring = useCallback((analyser) => {
@@ -378,8 +339,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         onNavigateToRecord();
       }
       
-      // Don't trigger greeting speech again - it was already played on page load
-      console.log('🎤 Wake word detected, navigation triggered');
+      // Trigger greeting speech
+      triggerGreetingSpeech();
     });
 
     voiceActivationService.setAudioLevelCallback((level) => {
@@ -399,7 +360,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setIsListening(false);
       }
     });
-  }, [onNavigateToRecord]);
+  }, [onNavigateToRecord, triggerGreetingSpeech]);
 
   // Initialize voice activation with fallback support
   const initializeVoiceActivation = useCallback(async () => {
@@ -508,21 +469,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // On mobile, we need user interaction for TTS, so start listening first
       if (useFallbackMode) {
         console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
-        console.log('🎤 useFallbackMode:', useFallbackMode, 'startFallbackListeningRef.current:', !!startFallbackListeningRef.current);
         // Start listening immediately on mobile
         setTimeout(() => {
-          if (startFallbackListeningRef.current) {
-            console.log('🎤 Calling startFallbackListeningRef.current()');
-            startFallbackListeningRef.current();
-          } else {
-            console.error('🎤 startFallbackListeningRef.current is not available, calling directly');
-            startFallbackListening();
-          }
+          startFallbackListeningRef.current();
         }, 500);
-        
-        // Don't mark as initialized yet - wait for user interaction
       } else {
-        console.log('🎤 Desktop mode: Playing greeting first');
         // Desktop: play greeting first
         setTimeout(() => {
           triggerGreetingSpeech();
@@ -531,15 +482,12 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
 
-  // Trigger greeting after user interaction (for mobile TTS requirement)
-  const triggerGreetingAfterInteraction = useCallback(async () => {
-    if (!greetingInitialized) {
-      console.log('🎤 Triggering greeting after user interaction...');
-      await triggerGreetingSpeech();
-    }
-  }, [greetingInitialized, triggerGreetingSpeech]);
-
   const value = {
+    isListening,
+    audioLevel,
+    error,
+    isInitialized,
+    showLoading,
     currentGreeting,
     greetingInitialized,
     useFallbackMode,
@@ -547,7 +495,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     startListening,
     stopListening,
     triggerGreetingSpeech,
-    triggerGreetingAfterInteraction,
     initializeVoiceActivation
   };
 

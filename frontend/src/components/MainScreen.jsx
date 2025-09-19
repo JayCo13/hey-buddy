@@ -20,7 +20,7 @@ const MainScreen = ({ onNavigate }) => {
     showLoading,
     currentGreeting,
     greetingInitialized,
-    triggerGreetingAfterInteraction,
+    triggerGreetingSpeech,
     useFallbackMode
   } = useVoiceActivation();
 
@@ -50,10 +50,10 @@ const MainScreen = ({ onNavigate }) => {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Trigger greeting after user interaction (for mobile TTS requirement)
-      await triggerGreetingAfterInteraction();
+      // Trigger greeting speech now that user has interacted (mobile TTS requirement)
+      await triggerGreetingSpeech();
     }
-  }, [speechEnabled, triggerGreetingAfterInteraction]);
+  }, [speechEnabled, triggerGreetingSpeech]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
