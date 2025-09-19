@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import voiceActivationService from '../services/voiceActivationService';
 import whisperService from '../services/whisperService';
 import greetingService from '../services/greetingService';
@@ -28,6 +28,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     isMobile: false
   });
 
+  // Ref to avoid circular dependency
+  const startFallbackListeningRef = useRef();
+
   // Detect device capabilities
   const detectDeviceCapabilities = useCallback(() => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -52,63 +55,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     return { isMobile, hasLowMemory, supportsWASM };
   }, []);
-
-  // Start fallback listening using Web Speech API
-  const startFallbackListening = useCallback(async () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = 'en-US';
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      console.log('🎤 Fallback speech recognition started');
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-      console.log('🎤 Fallback recognition result:', transcript);
-      
-      // Filter out common TTS artifacts
-      if (transcript.includes('object') || transcript.includes('undefined') || transcript.length < 3) {
-        console.log('🎤 Filtered out TTS artifact:', transcript);
-        return;
-      }
-      
-      // Check for wake word
-      if (transcript.includes('hey buddy') || transcript.includes('hey bud')) {
-        console.log('🎤 Wake word detected via fallback!');
-        recognition.stop();
-        handleWakeWordDetected('Hey Buddy', transcript);
-      }
-    };
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      setError(`Speech recognition error: ${event.error}`);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      console.log('🎤 Fallback speech recognition ended');
-      setIsListening(false);
-      
-      // Restart if we're still supposed to be listening and no TTS is playing
-      if (isListening && !speechSynthesis.speaking) {
-        setTimeout(() => {
-          recognition.start();
-        }, 1000); // Longer delay to avoid TTS interference
-      }
-    };
-
-    recognition.start();
-    
-    // Store for cleanup
-    window.fallbackRecognition = recognition;
-  }, [isListening, handleWakeWordDetected]);
 
   // Trigger greeting speech
   const triggerGreetingSpeech = useCallback(async () => {
@@ -147,7 +93,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           setTimeout(() => {
             console.log('🎤 Auto-starting hands-free listening...');
             if (useFallbackMode) {
-              startFallbackListening();
+              startFallbackListeningRef.current();
             } else {
               voiceActivationService.startListening();
             }
@@ -159,22 +105,78 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
     }
-  }, [useFallbackMode, startFallbackListening]);
+  }, [useFallbackMode]);
 
-  // Handle wake word detection
-  const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
-    console.log('🎤 Wake word detected:', wakeWord, transcription);
-    setIsListening(false);
+  // Start fallback listening using Web Speech API
+  const startFallbackListening = useCallback(async () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     
-    // Navigate to record room
-    if (onNavigateToRecord) {
-      console.log('🎤 Navigating to record room...');
-      onNavigateToRecord();
-    }
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      console.log('🎤 Fallback speech recognition started');
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+      console.log('🎤 Fallback recognition result:', transcript);
+      
+      // Filter out common TTS artifacts
+      if (transcript.includes('object') || transcript.includes('undefined') || transcript.length < 3) {
+        console.log('🎤 Filtered out TTS artifact:', transcript);
+        return;
+      }
+      
+      // Check for wake word
+      if (transcript.includes('hey buddy') || transcript.includes('hey bud')) {
+        console.log('🎤 Wake word detected via fallback!');
+        recognition.stop();
+        // Call wake word handler directly to avoid circular dependency
+        console.log('🎤 Wake word detected:', 'Hey Buddy', transcript);
+        setIsListening(false);
+        
+        // Navigate to record room
+        if (onNavigateToRecord) {
+          console.log('🎤 Navigating to record room...');
+          onNavigateToRecord();
+        }
+        
+        // Trigger greeting speech
+        triggerGreetingSpeech();
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      setError(`Speech recognition error: ${event.error}`);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      console.log('🎤 Fallback speech recognition ended');
+      setIsListening(false);
+      
+      // Restart if we're still supposed to be listening and no TTS is playing
+      if (isListening && !speechSynthesis.speaking) {
+        setTimeout(() => {
+          recognition.start();
+        }, 1000); // Longer delay to avoid TTS interference
+      }
+    };
+
+    recognition.start();
     
-    // Trigger greeting speech
-    await triggerGreetingSpeech();
-  }, [triggerGreetingSpeech, onNavigateToRecord]);
+    // Store for cleanup
+    window.fallbackRecognition = recognition;
+  }, [isListening, onNavigateToRecord, triggerGreetingSpeech]);
+
+  // Assign function to ref
+  startFallbackListeningRef.current = startFallbackListening;
 
   // Start audio level monitoring for fallback mode
   const startFallbackAudioLevelMonitoring = useCallback((analyser) => {
@@ -266,7 +268,16 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     // Set up callbacks
     voiceActivationService.setWakeWordCallback((wakeWord, transcription) => {
       console.log('🎤 Wake word detected:', wakeWord, transcription);
-      handleWakeWordDetected(wakeWord, transcription);
+      setIsListening(false);
+      
+      // Navigate to record room
+      if (onNavigateToRecord) {
+        console.log('🎤 Navigating to record room...');
+        onNavigateToRecord();
+      }
+      
+      // Trigger greeting speech
+      triggerGreetingSpeech();
     });
 
     voiceActivationService.setAudioLevelCallback((level) => {
@@ -286,7 +297,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setIsListening(false);
       }
     });
-  }, [handleWakeWordDetected]);
+  }, [onNavigateToRecord, triggerGreetingSpeech]);
 
   // Initialize voice activation with fallback support
   const initializeVoiceActivation = useCallback(async () => {
@@ -338,7 +349,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const startListening = useCallback(async () => {
     try {
       if (useFallbackMode) {
-        await startFallbackListening();
+        await startFallbackListeningRef.current();
       } else {
         const success = await voiceActivationService.startListening();
         if (!success) {
@@ -349,7 +360,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       console.error('Failed to start listening:', err);
       setError(`Failed to start listening: ${err.message}`);
     }
-  }, [useFallbackMode, startFallbackListening]);
+  }, [useFallbackMode]);
 
   // Stop listening
   const stopListening = useCallback(() => {
