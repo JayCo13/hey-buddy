@@ -73,6 +73,18 @@ class VoiceActivationService {
    */
   async initialize() {
     try {
+      // On mobile devices, try Web Speech API first for better compatibility
+      if (this.isMobileDevice()) {
+        console.log('Mobile device detected - attempting Web Speech API first...');
+        const webSpeechSuccess = await this.initializeWebSpeechFallback();
+        if (webSpeechSuccess) {
+          console.log('✅ Web Speech API initialization successful on mobile!');
+          return true;
+        } else {
+          console.log('Web Speech API failed on mobile, falling back to Whisper...');
+        }
+      }
+
       // Get mobile-optimized audio constraints
       const audioConstraints = this.getMobileOptimizedAudioConstraints();
       
@@ -694,6 +706,14 @@ class VoiceActivationService {
     source.start();
     
     return await offlineContext.startRendering();
+  }
+
+  /**
+   * Test if Web Speech API fallback is active
+   * @returns {Promise<boolean>} - True if Web Speech API fallback is active
+   */
+  async testWebSpeechFallback() {
+    return this.useWebSpeechFallback;
   }
 
   /**

@@ -49,6 +49,29 @@ class WebSpeechVoiceActivationService {
     }
 
     try {
+      // First, request microphone permission (same as RecordScreen)
+      console.log('Requesting microphone permission for Web Speech API...');
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 16000
+          }
+        });
+        
+        // Test the stream and then stop it
+        if (stream && stream.getAudioTracks().length > 0) {
+          console.log('Microphone permission granted for Web Speech API');
+          stream.getTracks().forEach(track => track.stop());
+        } else {
+          throw new Error('No audio tracks available');
+        }
+      } else {
+        throw new Error('Microphone API not available');
+      }
+
       console.log('Creating SpeechRecognition instance...');
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       this.recognition = new SpeechRecognition();
