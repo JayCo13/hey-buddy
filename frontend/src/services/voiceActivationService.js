@@ -133,10 +133,22 @@ class VoiceActivationService {
         console.log('Memory error detected on mobile device, attempting Web Speech API fallback...');
         const fallbackSuccess = await this.initializeWebSpeechFallback();
         if (fallbackSuccess) {
-          console.log('Web Speech API fallback successful!');
+          console.log('✅ Web Speech API fallback successful! Voice activation ready.');
           return true;
         } else {
-          console.log('Web Speech API fallback failed, returning original error');
+          console.log('❌ Web Speech API fallback failed, returning original error');
+        }
+      }
+      
+      // Also try Web Speech API fallback on any mobile error (not just memory errors)
+      if (this.isMobileDevice()) {
+        console.log('Mobile device detected, attempting Web Speech API fallback...');
+        const fallbackSuccess = await this.initializeWebSpeechFallback();
+        if (fallbackSuccess) {
+          console.log('✅ Web Speech API fallback successful! Voice activation ready.');
+          return true;
+        } else {
+          console.log('❌ Web Speech API fallback failed, returning original error');
         }
       }
       

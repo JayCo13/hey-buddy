@@ -74,7 +74,25 @@ class WebSpeechVoiceActivationService {
 
       this.recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
-        this.notifyError(`Speech recognition error: ${event.error}`);
+        
+        // Handle specific mobile errors
+        if (event.error === 'not-allowed') {
+          this.notifyError('Microphone permission denied. Please allow microphone access.');
+        } else if (event.error === 'no-speech') {
+          console.log('No speech detected, continuing to listen...');
+          // Don't treat this as an error, just restart
+          if (this.shouldRestart) {
+            setTimeout(() => {
+              try {
+                this.recognition.start();
+              } catch (e) {
+                console.warn('Auto-restart after no-speech failed:', e);
+              }
+            }, 100);
+          }
+        } else {
+          this.notifyError(`Speech recognition error: ${event.error}`);
+        }
       };
 
       this.recognition.onend = () => {
@@ -149,17 +167,22 @@ class WebSpeechVoiceActivationService {
       if (result.isFinal) {
         console.log('Web Speech voice activation - Final transcript:', transcript);
         
-        // Check for wake word variations
+        // Check for wake word variations (more sensitive for mobile)
         const wakeWordVariations = [
           'hey buddy',
           'hey bud',
           'buddy',
           'hey',
+          'buddy hey',
+          'hay buddy', // Common mispronunciation
+          'hi buddy',
+          'hey body', // Common mispronunciation
           'buddy hey'
         ];
         
         const detectedVariation = wakeWordVariations.find(variation => 
-          transcript.includes(variation)
+          transcript.includes(variation) || 
+          transcript.includes(variation.replace(' ', '')) // Check without spaces
         );
         
         if (detectedVariation) {
