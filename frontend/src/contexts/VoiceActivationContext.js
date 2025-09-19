@@ -57,14 +57,19 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const triggerGreetingSpeech = useCallback(async () => {
     try {
       console.log('🎤 Triggering greeting speech...');
-      const greeting = await greetingService.generateGreeting();
-      console.log('🎤 Greeting received:', greeting);
-      setCurrentGreeting(greeting);
+      const greetingObj = await greetingService.generateGreeting();
+      console.log('🎤 Greeting received:', greetingObj);
+      
+      // Extract the text from the greeting object
+      const greetingText = greetingObj.text || greetingObj;
+      console.log('🎤 Greeting text:', greetingText);
+      
+      setCurrentGreeting(greetingObj);
       setGreetingInitialized(true);
       
       // Use TTS to speak the greeting
       if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(greeting);
+        const utterance = new SpeechSynthesisUtterance(greetingText);
         utterance.rate = 0.9;
         utterance.pitch = 1.0;
         utterance.volume = 0.8;
@@ -73,6 +78,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         if (useFallbackMode) {
           if (window.fallbackRecognition) {
             window.fallbackRecognition.stop();
+            window.fallbackRecognition = null; // Clear reference to prevent restart
           }
         } else {
           voiceActivationService.pauseVoiceActivation();
@@ -80,14 +86,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         utterance.onend = () => {
           console.log('🎤 Greeting speech completed');
-          // Resume voice activation after TTS
+          // Resume voice activation after TTS with longer delay
           if (useFallbackMode) {
             setTimeout(() => {
-              // Restart fallback listening
-              if (window.fallbackRecognition) {
-                window.fallbackRecognition.start();
+              // Only restart if we're supposed to be listening
+              if (isListening) {
+                startFallbackListening();
               }
-            }, 1000);
+            }, 3000); // Longer delay to avoid picking up TTS
           } else {
             voiceActivationService.resumeVoiceActivation();
           }
@@ -166,6 +172,12 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
       console.log('🎤 Fallback recognition result:', transcript);
       
+      // Filter out common TTS artifacts
+      if (transcript.includes('object') || transcript.includes('undefined') || transcript.length < 3) {
+        console.log('🎤 Filtered out TTS artifact:', transcript);
+        return;
+      }
+      
       // Check for wake word
       if (transcript.includes('hey buddy') || transcript.includes('hey bud')) {
         console.log('🎤 Wake word detected via fallback!');
@@ -184,11 +196,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       console.log('🎤 Fallback speech recognition ended');
       setIsListening(false);
       
-      // Restart if we're still supposed to be listening
-      if (isListening) {
+      // Restart if we're still supposed to be listening and no TTS is playing
+      if (isListening && !speechSynthesis.speaking) {
         setTimeout(() => {
           recognition.start();
-        }, 100);
+        }, 1000); // Longer delay to avoid TTS interference
       }
     };
 
@@ -376,6 +388,17 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       whisperService.cleanup();
     };
   }, [initializeVoiceActivation, useFallbackMode]);
+
+  // Trigger immediate greeting when initialized
+  useEffect(() => {
+    if (isInitialized && !greetingInitialized) {
+      console.log('🎤 Voice activation initialized, triggering immediate greeting...');
+      // Small delay to ensure everything is ready
+      setTimeout(() => {
+        triggerGreetingSpeech();
+      }, 1000);
+    }
+  }, [isInitialized, greetingInitialized, triggerGreetingSpeech]);
 
   const value = {
     isListening,
