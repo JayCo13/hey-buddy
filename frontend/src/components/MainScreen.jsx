@@ -325,13 +325,13 @@ const MainScreen = ({ onNavigate }) => {
                 </div>
               )}
               
-              {/* Mobile fallback mode indicator */}
-              {useFallbackMode && !error && (
-                <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              {/* Hands-free mode indicator */}
+              {isInitialized && !error && (
+                <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                    <p className="text-blue-400 text-xs">
-                      Mobile-optimized voice mode • Tap microphone to activate
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <p className="text-green-400 text-xs">
+                      Hands-free mode • Say "Hey Buddy" to activate
                     </p>
                   </div>
                 </div>
@@ -340,35 +340,14 @@ const MainScreen = ({ onNavigate }) => {
               {/* Simple status indicator */}
               <div className="text-center">
                 {!isInitialized ? (
-                  <div className="text-gray-400 text-sm">Initializing voice activation...</div>
+                  <div className="text-gray-400 text-sm">Initializing hands-free voice activation...</div>
                 ) : isListening ? (
-                  <div className="text-blue-400 text-sm">🎤 Listening...</div>
+                  <div className="text-green-400 text-sm">🎤 Hands-free listening active</div>
                 ) : (
-                  <div className="text-gray-400 text-sm">Ready to listen</div>
+                  <div className="text-gray-400 text-sm">Preparing hands-free mode...</div>
                 )}
               </div>
               
-              {/* Mobile microphone button */}
-              {useFallbackMode && isInitialized && (
-                <div className="mt-4 flex justify-center">
-                  <button
-                    onClick={async () => {
-                      if (isListening) {
-                        stopListening();
-                      } else {
-                        await startListening();
-                      }
-                    }}
-                    className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 ${
-                      isListening 
-                        ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/25' 
-                        : 'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/25'
-                    }`}
-                  >
-                    <Mic className={`w-8 h-8 text-white ${isListening ? 'animate-pulse' : ''}`} />
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 

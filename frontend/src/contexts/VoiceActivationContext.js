@@ -86,17 +86,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         utterance.onend = () => {
           console.log('🎤 Greeting speech completed');
-          // Resume voice activation after TTS with longer delay
-          if (useFallbackMode) {
-            setTimeout(() => {
-              // Only restart if we're supposed to be listening
-              if (isListening) {
-                startFallbackListening();
-              }
-            }, 3000); // Longer delay to avoid picking up TTS
-          } else {
-            voiceActivationService.resumeVoiceActivation();
-          }
+          // Auto-start listening after greeting (hands-free)
+          setTimeout(() => {
+            if (!isListening) {
+              console.log('🎤 Auto-starting hands-free listening...');
+              startListening();
+            }
+          }, 2000); // Wait 2 seconds after greeting to start listening
         };
         
         speechSynthesis.speak(utterance);
@@ -104,7 +100,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
     }
-  }, [useFallbackMode]);
+  }, [useFallbackMode, isListening, startListening]);
 
   // Handle wake word detection
   const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
@@ -399,6 +395,17 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       }, 1000);
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech]);
+
+  // Auto-start listening after greeting is completed
+  useEffect(() => {
+    if (greetingInitialized && isInitialized && !isListening) {
+      console.log('🎤 Greeting completed, auto-starting voice listening...');
+      // Start listening automatically after greeting
+      setTimeout(() => {
+        startListening();
+      }, 2000); // Wait 2 seconds after greeting to start listening
+    }
+  }, [greetingInitialized, isInitialized, isListening, startListening]);
 
   const value = {
     isListening,
