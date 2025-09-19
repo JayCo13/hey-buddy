@@ -53,107 +53,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     return { isMobile, hasLowMemory, supportsWASM };
   }, []);
 
-  // Trigger greeting speech
-  const triggerGreetingSpeech = useCallback(async () => {
-    try {
-      console.log('🎤 Triggering greeting speech...');
-      const greetingObj = await greetingService.generateGreeting();
-      console.log('🎤 Greeting received:', greetingObj);
-      
-      // Extract the text from the greeting object
-      const greetingText = greetingObj.text || greetingObj;
-      console.log('🎤 Greeting text:', greetingText);
-      
-      setCurrentGreeting(greetingObj);
-      setGreetingInitialized(true);
-      
-      // Use TTS to speak the greeting
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(greetingText);
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 0.8;
-        
-        // Pause voice activation during TTS
-        if (useFallbackMode) {
-          if (window.fallbackRecognition) {
-            window.fallbackRecognition.stop();
-            window.fallbackRecognition = null; // Clear reference to prevent restart
-          }
-        } else {
-          voiceActivationService.pauseVoiceActivation();
-        }
-        
-        utterance.onend = () => {
-          console.log('🎤 Greeting speech completed');
-          // Auto-start listening after greeting (hands-free)
-          setTimeout(() => {
-            if (!isListening) {
-              console.log('🎤 Auto-starting hands-free listening...');
-              // Use direct function call instead of dependency
-              if (useFallbackMode) {
-                startFallbackListening();
-              } else {
-                voiceActivationService.startListening();
-              }
-            }
-          }, 2000); // Wait 2 seconds after greeting to start listening
-        };
-        
-        speechSynthesis.speak(utterance);
-      }
-    } catch (err) {
-      console.error('Failed to trigger greeting speech:', err);
-    }
-  }, [useFallbackMode, isListening]);
-
-  // Handle wake word detection
-  const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
-    console.log('🎤 Wake word detected:', wakeWord, transcription);
-    setIsListening(false);
-    
-    // Navigate to record room
-    if (onNavigateToRecord) {
-      console.log('🎤 Navigating to record room...');
-      onNavigateToRecord();
-    }
-    
-    // Trigger greeting speech
-    await triggerGreetingSpeech();
-  }, [triggerGreetingSpeech, onNavigateToRecord]);
-
-  // Start audio level monitoring for fallback mode
-  const startFallbackAudioLevelMonitoring = useCallback((analyser) => {
-    const bufferLength = analyser.frequencyBinCount;
-    const timeDataArray = new Float32Array(bufferLength);
-    
-    let smoothedLevel = 0.05;
-    const monitor = () => {
-      try {
-        analyser.getFloatTimeDomainData(timeDataArray);
-        
-        let rmsSum = 0;
-        for (let i = 0; i < timeDataArray.length; i++) {
-          const sample = timeDataArray[i];
-          rmsSum += sample * sample;
-        }
-        const rms = Math.sqrt(rmsSum / timeDataArray.length);
-        
-        // Smooth the audio level
-        smoothedLevel = smoothedLevel * 0.8 + rms * 0.2;
-        smoothedLevel = Math.max(0.05, Math.min(1.0, smoothedLevel));
-        
-        setAudioLevel(smoothedLevel);
-        requestAnimationFrame(monitor);
-      } catch (error) {
-        console.error('Error in fallback audio monitoring:', error);
-        requestAnimationFrame(monitor);
-      }
-    };
-    
-    monitor();
-  }, []);
-
   // Start fallback listening using Web Speech API
   const startFallbackListening = useCallback(async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -210,6 +109,104 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     // Store for cleanup
     window.fallbackRecognition = recognition;
   }, [isListening, handleWakeWordDetected]);
+
+  // Trigger greeting speech
+  const triggerGreetingSpeech = useCallback(async () => {
+    try {
+      console.log('🎤 Triggering greeting speech...');
+      const greetingObj = await greetingService.generateGreeting();
+      console.log('🎤 Greeting received:', greetingObj);
+      
+      // Extract the text from the greeting object
+      const greetingText = greetingObj.text || greetingObj;
+      console.log('🎤 Greeting text:', greetingText);
+      
+      setCurrentGreeting(greetingObj);
+      setGreetingInitialized(true);
+      
+      // Use TTS to speak the greeting
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(greetingText);
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.8;
+        
+        // Pause voice activation during TTS
+        if (useFallbackMode) {
+          if (window.fallbackRecognition) {
+            window.fallbackRecognition.stop();
+            window.fallbackRecognition = null; // Clear reference to prevent restart
+          }
+        } else {
+          voiceActivationService.pauseVoiceActivation();
+        }
+        
+        utterance.onend = () => {
+          console.log('🎤 Greeting speech completed');
+          // Auto-start hands-free listening after greeting
+          setTimeout(() => {
+            console.log('🎤 Auto-starting hands-free listening...');
+            if (useFallbackMode) {
+              startFallbackListening();
+            } else {
+              voiceActivationService.startListening();
+            }
+          }, 2000); // Wait 2 seconds after greeting to start listening
+        };
+        
+        speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      console.error('Failed to trigger greeting speech:', err);
+    }
+  }, [useFallbackMode, startFallbackListening]);
+
+  // Handle wake word detection
+  const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
+    console.log('🎤 Wake word detected:', wakeWord, transcription);
+    setIsListening(false);
+    
+    // Navigate to record room
+    if (onNavigateToRecord) {
+      console.log('🎤 Navigating to record room...');
+      onNavigateToRecord();
+    }
+    
+    // Trigger greeting speech
+    await triggerGreetingSpeech();
+  }, [triggerGreetingSpeech, onNavigateToRecord]);
+
+  // Start audio level monitoring for fallback mode
+  const startFallbackAudioLevelMonitoring = useCallback((analyser) => {
+    const bufferLength = analyser.frequencyBinCount;
+    const timeDataArray = new Float32Array(bufferLength);
+    
+    let smoothedLevel = 0.05;
+    const monitor = () => {
+      try {
+        analyser.getFloatTimeDomainData(timeDataArray);
+        
+        let rmsSum = 0;
+        for (let i = 0; i < timeDataArray.length; i++) {
+          const sample = timeDataArray[i];
+          rmsSum += sample * sample;
+        }
+        const rms = Math.sqrt(rmsSum / timeDataArray.length);
+        
+        // Smooth the audio level
+        smoothedLevel = smoothedLevel * 0.8 + rms * 0.2;
+        smoothedLevel = Math.max(0.05, Math.min(1.0, smoothedLevel));
+        
+        setAudioLevel(smoothedLevel);
+        requestAnimationFrame(monitor);
+      } catch (error) {
+        console.error('Error in fallback audio monitoring:', error);
+        requestAnimationFrame(monitor);
+      }
+    };
+    
+    monitor();
+  }, []);
 
   // Initialize fallback mode using Web Speech API
   const initializeFallbackMode = useCallback(async () => {
@@ -400,21 +397,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       }, 1000);
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech]);
-
-  // Auto-start listening after greeting is completed
-  useEffect(() => {
-    if (greetingInitialized && isInitialized && !isListening) {
-      console.log('🎤 Greeting completed, auto-starting voice listening...');
-      // Start listening automatically after greeting
-      setTimeout(() => {
-        if (useFallbackMode) {
-          startFallbackListening();
-        } else {
-          voiceActivationService.startListening();
-        }
-      }, 2000); // Wait 2 seconds after greeting to start listening
-    }
-  }, [greetingInitialized, isInitialized, isListening, useFallbackMode]);
 
   const value = {
     isListening,

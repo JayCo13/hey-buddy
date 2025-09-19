@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import ProfileScreen from './ProfileScreen';
-import MobileMicrophonePermission from './MobileMicrophonePermission';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Signal, Wifi, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
@@ -11,7 +10,6 @@ const MainScreen = ({ onNavigate }) => {
   const [playingAudio, setPlayingAudio] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
-  const [showMicrophonePermission, setShowMicrophonePermission] = useState(false);
   
   // Voice activation context
   const {
@@ -23,10 +21,7 @@ const MainScreen = ({ onNavigate }) => {
     currentGreeting,
     greetingInitialized,
     triggerGreetingSpeech,
-    useFallbackMode,
-    deviceCapabilities,
-    startListening,
-    stopListening
+    useFallbackMode
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -78,7 +73,7 @@ const MainScreen = ({ onNavigate }) => {
         if (!permissionGranted) {
           // Small delay to let the app load first
           setTimeout(() => {
-            setShowMicrophonePermission(true);
+            // Hands-free mode - no need to show permission modal
           }, 2000);
         }
       } catch (error) {
@@ -315,7 +310,7 @@ const MainScreen = ({ onNavigate }) => {
                         <div>
                           <p className="font-medium mb-1">Mobile Voice Mode Active</p>
                           <p>Using simplified voice recognition for better mobile performance.</p>
-                          <p className="mt-1 text-red-300">Tap the microphone to start listening.</p>
+                          <p className="mt-1 text-red-300">Hands-free listening will start automatically.</p>
                         </div>
                       ) : (
                         <p>{error}</p>
@@ -325,13 +320,13 @@ const MainScreen = ({ onNavigate }) => {
                 </div>
               )}
               
-              {/* Hands-free mode indicator */}
-              {isInitialized && !error && (
-                <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+              {/* Mobile fallback mode indicator */}
+              {useFallbackMode && !error && (
+                <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <p className="text-green-400 text-xs">
-                      Hands-free mode • Say "Hey Buddy" to activate
+                    <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                    <p className="text-blue-400 text-xs">
+                      Mobile-optimized voice mode • Hands-free listening active
                     </p>
                   </div>
                 </div>
@@ -340,11 +335,11 @@ const MainScreen = ({ onNavigate }) => {
               {/* Simple status indicator */}
               <div className="text-center">
                 {!isInitialized ? (
-                  <div className="text-gray-400 text-sm">Initializing hands-free voice activation...</div>
+                  <div className="text-gray-400 text-sm">Initializing voice activation...</div>
                 ) : isListening ? (
-                  <div className="text-green-400 text-sm">🎤 Hands-free listening active</div>
+                  <div className="text-blue-400 text-sm">🎤 Listening...</div>
                 ) : (
-                  <div className="text-gray-400 text-sm">Preparing hands-free mode...</div>
+                  <div className="text-gray-400 text-sm">Ready to listen</div>
                 )}
               </div>
               
