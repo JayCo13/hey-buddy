@@ -17,7 +17,6 @@ const MainScreen = ({ onNavigate }) => {
     audioLevel,
     error,
     isInitialized,
-    showLoading,
     currentGreeting,
     greetingInitialized,
     triggerGreetingSpeech,
@@ -474,17 +473,6 @@ const MainScreen = ({ onNavigate }) => {
           ))}
         </div>
       </div>
-      
-      {/* Voice Activation Loading Overlay */}
-      {showLoading && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="text-center">
-            <div className="w-16 h-16 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-white text-lg font-medium">Listening...</p>
-          </div>
-        </div>
-      )}
-
       
     </div>
   );

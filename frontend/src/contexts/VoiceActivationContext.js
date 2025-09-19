@@ -18,7 +18,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const [audioLevel, setAudioLevel] = useState(0.05);
   const [error, setError] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [showLoading, setShowLoading] = useState(false);
   const [currentGreeting, setCurrentGreeting] = useState('');
   const [greetingInitialized, setGreetingInitialized] = useState(false);
   const [useFallbackMode, setUseFallbackMode] = useState(false);
@@ -217,13 +216,15 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       console.log('🎤 Fallback speech recognition ended');
       setIsListening(false);
       
-      // Restart if we're still supposed to be listening and no TTS is playing
-      if (isListening && !speechSynthesis.speaking) {
-        setTimeout(() => {
-          console.log('🎤 Restarting recognition...');
+      // Always restart recognition after a delay (except for fatal errors)
+      setTimeout(() => {
+        console.log('🎤 Restarting recognition...');
+        try {
           recognition.start();
-        }, 1000); // Longer delay to avoid TTS interference
-      }
+        } catch (restartError) {
+          console.error('🎤 Failed to restart recognition:', restartError);
+        }
+      }, 2000); // Longer delay to allow navigation to complete
     };
 
     try {
@@ -236,7 +237,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     
     // Store for cleanup
     window.fallbackRecognition = recognition;
-  }, [isListening, onNavigateToRecord]);
+  }, [onNavigateToRecord]);
 
   // Assign function to ref
   startFallbackListeningRef.current = startFallbackListening;
@@ -365,7 +366,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Initialize voice activation with fallback support
   const initializeVoiceActivation = useCallback(async () => {
     try {
-      setShowLoading(true);
       setError(null);
 
       // Initialize greeting service first
@@ -403,8 +403,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       } else {
         setError(`Voice activation initialization error: ${err.message}`);
       }
-    } finally {
-      setShowLoading(false);
     }
   }, [useFallbackMode, detectDeviceCapabilities, initializeFallbackMode, initializeWASMMode]);
 
@@ -482,12 +480,33 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
 
+  // Restart listening when user returns to the page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isInitialized && useFallbackMode) {
+        console.log('🎤 Page became visible, restarting voice recognition...');
+        // Small delay to ensure page is fully loaded
+        setTimeout(() => {
+          if (!window.fallbackRecognition || window.fallbackRecognition.state === 'ended') {
+            console.log('🎤 Restarting fallback recognition...');
+            startFallbackListeningRef.current();
+          }
+        }, 1000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isInitialized, useFallbackMode]);
+
   const value = {
     isListening,
     audioLevel,
     error,
     isInitialized,
-    showLoading,
     currentGreeting,
     greetingInitialized,
     useFallbackMode,
