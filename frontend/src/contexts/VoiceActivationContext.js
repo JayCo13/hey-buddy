@@ -72,9 +72,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Use TTS to speak the greeting
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(greetingText);
-        utterance.rate = 0.9;
+        utterance.rate = 1.0; // Faster rate for smoother experience
         utterance.pitch = 1.0;
-        utterance.volume = 0.8;
+        utterance.volume = 0.9; // Higher volume for clarity
         
         // Pause voice activation during TTS
         if (useFallbackMode) {
@@ -88,7 +88,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         utterance.onend = () => {
           console.log('🎤 Greeting speech completed');
-          // Auto-start hands-free listening after greeting
+          // Auto-start hands-free listening after greeting with shorter delay
           setTimeout(() => {
             console.log('🎤 Auto-starting hands-free listening...');
             if (useFallbackMode) {
@@ -96,7 +96,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             } else {
               voiceActivationService.startListening();
             }
-          }, 2000); // Wait 2 seconds after greeting to start listening
+          }, 1000); // Reduced delay for smoother experience
         };
         
         utterance.onerror = (event) => {
@@ -110,7 +110,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             } else {
               voiceActivationService.startListening();
             }
-          }, 1000);
+          }, 500); // Faster recovery
         };
         
         // Try to speak, but don't fail if it doesn't work on mobile
@@ -126,7 +126,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             } else {
               voiceActivationService.startListening();
             }
-          }, 1000);
+          }, 500); // Faster recovery
         }
       } else {
         console.warn('🎤 Speech synthesis not available');
@@ -138,7 +138,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           } else {
             voiceActivationService.startListening();
           }
-        }, 1000);
+        }, 500); // Faster start
       }
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
@@ -200,7 +200,12 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
-      setError(`Speech recognition error: ${event.error}`);
+      
+      // Don't show "aborted" errors as they're normal during navigation
+      if (event.error !== 'aborted') {
+        setError(`Speech recognition error: ${event.error}`);
+      }
+      
       setIsListening(false);
       
       // Try to restart after error (except for certain fatal errors)
@@ -208,7 +213,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setTimeout(() => {
           console.log('🎤 Restarting recognition after error...');
           recognition.start();
-        }, 2000);
+        }, 1000); // Reduced delay for faster recovery
       }
     };
 
@@ -224,7 +229,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         } catch (restartError) {
           console.error('🎤 Failed to restart recognition:', restartError);
         }
-      }, 2000); // Longer delay to allow navigation to complete
+      }, 1000); // Reduced delay for faster restart
     };
 
     try {
@@ -475,7 +480,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         // Desktop: play greeting first
         setTimeout(() => {
           triggerGreetingSpeech();
-        }, 1000);
+        }, 500); // Reduced delay for faster greeting
       }
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
@@ -491,7 +496,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             console.log('🎤 Restarting fallback recognition...');
             startFallbackListeningRef.current();
           }
-        }, 1000);
+        }, 500); // Reduced delay for faster restart
       }
     };
 
