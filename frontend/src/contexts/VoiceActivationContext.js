@@ -194,8 +194,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           console.error('🎤 onNavigateToRecord not available!');
         }
         
-        // Trigger greeting speech
-        triggerGreetingSpeech();
+        // Don't trigger greeting speech again - it was already played on page load
+        console.log('🎤 Wake word detected, navigation triggered');
       }
     };
 
@@ -236,7 +236,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     
     // Store for cleanup
     window.fallbackRecognition = recognition;
-  }, [isListening, onNavigateToRecord, triggerGreetingSpeech]);
+  }, [isListening, onNavigateToRecord]);
 
   // Assign function to ref
   startFallbackListeningRef.current = startFallbackListening;
@@ -339,8 +339,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         onNavigateToRecord();
       }
       
-      // Trigger greeting speech
-      triggerGreetingSpeech();
+      // Don't trigger greeting speech again - it was already played on page load
+      console.log('🎤 Wake word detected, navigation triggered');
     });
 
     voiceActivationService.setAudioLevelCallback((level) => {
@@ -360,7 +360,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setIsListening(false);
       }
     });
-  }, [onNavigateToRecord, triggerGreetingSpeech]);
+  }, [onNavigateToRecord]);
 
   // Initialize voice activation with fallback support
   const initializeVoiceActivation = useCallback(async () => {
@@ -473,6 +473,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setTimeout(() => {
           startFallbackListeningRef.current();
         }, 500);
+        
+        // Don't mark as initialized yet - wait for user interaction
       } else {
         // Desktop: play greeting first
         setTimeout(() => {
@@ -482,12 +484,15 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
 
+  // Trigger greeting after user interaction (for mobile TTS requirement)
+  const triggerGreetingAfterInteraction = useCallback(async () => {
+    if (!greetingInitialized) {
+      console.log('🎤 Triggering greeting after user interaction...');
+      await triggerGreetingSpeech();
+    }
+  }, [greetingInitialized, triggerGreetingSpeech]);
+
   const value = {
-    isListening,
-    audioLevel,
-    error,
-    isInitialized,
-    showLoading,
     currentGreeting,
     greetingInitialized,
     useFallbackMode,
@@ -495,6 +500,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     startListening,
     stopListening,
     triggerGreetingSpeech,
+    triggerGreetingAfterInteraction,
     initializeVoiceActivation
   };
 
