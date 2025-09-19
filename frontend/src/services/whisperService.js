@@ -14,51 +14,6 @@ class WhisperService {
   }
 
   /**
-   * Detect if running on mobile device
-   * @returns {boolean} - True if mobile device
-   */
-  isMobileDevice() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
-  }
-
-  /**
-   * Get memory-optimized configuration for mobile devices
-   * @returns {Object} - Configuration object
-   */
-  getMemoryOptimizedConfig() {
-    const isMobile = this.isMobileDevice();
-    
-    if (isMobile) {
-      console.log('Mobile device detected - using ultra-aggressive memory optimization');
-      return {
-        dtype: 'q4', // Quantized model for lower memory usage
-        device: 'wasm',
-        // Ultra-aggressive mobile WASM configuration
-        wasm: {
-          initialMemory: 64 * 1024 * 1024, // 64MB initial memory (very conservative)
-          maximumMemory: 128 * 1024 * 1024, // 128MB max memory (very conservative)
-          memoryGrowth: true, // Allow memory to grow as needed
-        },
-        // Additional mobile optimizations
-        progress_callback: null, // Disable progress callbacks to save memory
-        local_files_only: false, // Allow remote loading but with minimal memory
-      };
-    } else {
-      return {
-        dtype: 'q4',
-        device: 'wasm',
-        // Desktop configuration with more memory
-        wasm: {
-          initialMemory: 256 * 1024 * 1024, // 256MB initial memory
-          maximumMemory: 512 * 1024 * 1024, // 512MB max memory
-          memoryGrowth: true,
-        }
-      };
-    }
-  }
-
-  /**
    * Initialize the Whisper model using Transformers.js
    * @param {Function} onProgress - Progress callback for model loading
    * @returns {Promise<boolean>} - True if initialization successful
@@ -105,11 +60,11 @@ class WhisperService {
         onProgress({ stage: 'loading_model', message: 'Loading Whisper model...' });
       }
 
-      // Get memory-optimized configuration
-      const config = this.getMemoryOptimizedConfig();
-      
-      // Load model with memory-optimized configuration
-      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', config);
+      // Load model - use tiny model for faster response
+      this.model = await AutoModelForSpeechSeq2Seq.from_pretrained('Xenova/whisper-tiny.en', {
+        dtype: 'q4', // Use q4 for faster processing
+        device: 'wasm'
+      });
 
       // Initialize audio context
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -128,14 +83,6 @@ class WhisperService {
     } catch (error) {
       console.error('Failed to initialize Whisper model:', error);
       this.isInitialized = false;
-      
-      // Provide more specific error messages for mobile memory issues
-      if (error.message.includes('Out of memory') || error.message.includes('RangeError')) {
-        const memoryError = new Error('Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.');
-        memoryError.isMemoryError = true; // Flag for fallback detection
-        throw memoryError;
-      }
-      
       throw error;
     } finally {
       this.isLoading = false;
@@ -267,42 +214,22 @@ class WhisperService {
       
       console.log(`Audio length: ${audioLengthSeconds.toFixed(2)}s, Max amplitude: ${maxVal.toFixed(4)}`);
       
-      // Prepare inputs with mobile-optimized configuration
-      const isMobile = this.isMobileDevice();
-      const processorConfig = isMobile ? {
-        chunk_length_s: 10, // Even shorter chunks for mobile
-        stride_length_s: 1,  // Smaller stride for mobile
-        return_tensors: 'pt'
-      } : {
+      // Prepare inputs with optimized configuration for faster processing
+      const inputs = await this.processor(audioData, {
         chunk_length_s: 15, // Shorter chunks for faster processing
         stride_length_s: 2,  // Smaller stride for better wake word detection
         return_tensors: 'pt'
-      };
+      });
       
-      const inputs = await this.processor(audioData, processorConfig);
-      
-      // Generate transcription with mobile-optimized parameters
-      const generateConfig = isMobile ? {
-        ...inputs,
-        max_new_tokens: 32,    // Even more reduced for mobile (wake words are short)
-        do_sample: false,
-        num_beams: 1,          // Single beam for speed
-        early_stopping: true,  // Stop early when possible
-        pad_token_id: this.processor.tokenizer.eos_token_id,
-        // Additional mobile optimizations
-        temperature: 0.0,      // Deterministic output
-        top_p: 1.0,           // No nucleus sampling
-        repetition_penalty: 1.0, // No repetition penalty
-      } : {
+      // Generate transcription with optimized parameters for speed
+      const outputs = await this.model.generate({
         ...inputs,
         max_new_tokens: 64,    // Reduced for faster processing (wake words are short)
         do_sample: false,
         num_beams: 1,          // Single beam for speed
         early_stopping: true,  // Stop early when possible
         pad_token_id: this.processor.tokenizer.eos_token_id
-      };
-      
-      const outputs = await this.model.generate(generateConfig);
+      });
 
       // Decode the output
       const transcription = this.processor.tokenizer.decode(outputs[0], {

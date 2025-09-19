@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import voiceActivationService from '../services/voiceActivationService';
+import whisperService from '../services/whisperService';
 import greetingService from '../services/greetingService';
 import piperService from '../services/piperService';
 
@@ -122,30 +123,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('Piper service ready:', piperService.isReady());
     console.log('Piper service status:', piperService.getStatus());
     console.log('Greeting service status:', greetingService.getServiceStatus());
-    console.log('Voice activation status:', voiceActivationService.getStatus());
     console.log('==================');
   };
-
-  // Test Web Speech API fallback function
-  const testWebSpeechFallback = async () => {
-    try {
-      console.log('Testing Web Speech API fallback...');
-      const status = voiceActivationService.getStatus();
-      console.log('Current voice activation status:', status);
-      
-      if (status.useWebSpeechFallback) {
-        console.log('✅ Web Speech API fallback is active!');
-        return true;
-      } else {
-        console.log('❌ Web Speech API fallback is not active');
-        return false;
-      }
-    } catch (error) {
-      console.error('Web Speech API fallback test failed:', error);
-      return false;
-    }
-  };
-
 
   // Ultra-fast greeting speech
   const speakGreeting = async (greeting) => {
@@ -202,13 +181,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         // Initialize voice activation service
         console.log('Initializing voice activation service...');
-        const voiceActivationSuccess = await voiceActivationService.initialize();
-        
-        if (!voiceActivationSuccess) {
-          console.error('Voice activation service initialization failed');
-          setError('Voice activation service initialization failed');
-          return; // Don't throw error, just set error state and continue
-        }
+        await voiceActivationService.initialize();
         
         // Set up callbacks for voice activation
         voiceActivationService.setWakeWordCallback(handleWakeWordDetected);
@@ -216,7 +189,12 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         voiceActivationService.setErrorCallback(handleError);
         voiceActivationService.setStatusCallback(handleStatusChange);
         
-        console.log('Voice activation service initialized successfully');
+        console.log('Voice activation service initialized');
+        
+        // Initialize whisper service for speech recognition
+        console.log('Initializing whisper service...');
+        await whisperService.initialize();
+        console.log('Whisper service initialized');
         
         // ULTRA-FAST INITIALIZATION
         console.log('Initializing TTS...');
@@ -241,21 +219,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         }
       } catch (err) {
         console.error('Voice activation initialization error:', err);
-        
-        // Check if this is a memory-related error and provide helpful guidance
-        if (err.message.includes('memory') || err.message.includes('Memory')) {
-          setError(`Voice activation requires more memory than available on this device. Please try closing other apps or using a device with more memory.`);
-        } else {
-          setError(`Voice activation initialization error: ${err.message}`);
-        }
-        
-        // Check if Web Speech API fallback is available
-        const status = voiceActivationService.getStatus();
-        if (status.useWebSpeechFallback) {
-          console.log('Web Speech API fallback is active, clearing error state');
-          setError(null); // Clear error if fallback is working
-        }
-        
+        setError(`Voice activation initialization error: ${err.message}`);
         initializationStartedRef.current = false; // Reset on error
       }
     };
@@ -359,7 +323,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     setIsProcessing(false);
   };
 
-  // Real-time wake word detection (works with both Whisper and Web Speech API)
+  // Real-time wake word detection using Whisper
   const startRealTimeDetection = async () => {
     if (!isInitialized) {
       setError('Voice activation not initialized. Please wait for initialization to complete.');
@@ -368,8 +332,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     try {
       console.log('Starting real-time detection...');
-      // Use the unified voice activation service (works with both Whisper and Web Speech API)
-      const success = await voiceActivationService.startListening();
+      // Use the improved voice activation service for real-time detection
+      const success = await voiceActivationService.startRealTimeWakeWordDetection();
       if (success) {
         setIsListening(true);
         setStatus('listening');
@@ -421,7 +385,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Debug functions
       testSpeech,
       debugState,
-      testWebSpeechFallback,
     
     
     // Status helpers

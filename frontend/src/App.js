@@ -4,6 +4,7 @@ import { initializeDatabase } from './db/database';
 import SplashScreen from './components/SplashScreen';
 import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import offlineSyncManager from './utils/offlineSync';
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
   return (
     <>
       <AppNavigator />
+      <PWAInstallPrompt />
     </>
   );
 }

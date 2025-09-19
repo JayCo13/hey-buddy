@@ -23,15 +23,6 @@ class PiperService {
     this.currentAudio = null; // Track current audio for smooth playback
   }
 
-  /**
-   * Detect if running on mobile device
-   * @returns {boolean} - True if mobile device
-   */
-  isMobileDevice() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-           (typeof window !== 'undefined' && window.innerWidth <= 768);
-  }
-
 
   /**
    * Initialize the Piper model using Transformers.js
@@ -198,14 +189,8 @@ class PiperService {
       await this.initialize();
     }
 
-    // Use Web Speech API on mobile devices for better compatibility
-    if (this.useWebSpeech || this.isMobileDevice()) {
-      console.log('Using Web Speech API for mobile compatibility');
-      await this.speakWithWebSpeech(text, options);
-    } else {
-      // Use offline Piper TTS for desktop
-      await this.speakWithOfflinePiper(text, options);
-    }
+    // Ultra-fast direct speech
+    await this.speakWithOfflinePiper(text, options);
   }
 
   /**

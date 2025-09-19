@@ -12,7 +12,6 @@ const MainScreen = ({ onNavigate }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
   const [showMicrophonePermission, setShowMicrophonePermission] = useState(false);
-  const [useWebSpeechFallback, setUseWebSpeechFallback] = useState(false);
   
   // Voice activation context
   const {
@@ -23,8 +22,7 @@ const MainScreen = ({ onNavigate }) => {
     showLoading,
     currentGreeting,
     greetingInitialized,
-    triggerGreetingSpeech,
-    testWebSpeechFallback
+    triggerGreetingSpeech
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -57,18 +55,6 @@ const MainScreen = ({ onNavigate }) => {
       await triggerGreetingSpeech();
     }
   };
-
-  // Check Web Speech API fallback status
-  useEffect(() => {
-    const checkFallbackStatus = async () => {
-      if (isInitialized && testWebSpeechFallback) {
-        const isUsingFallback = await testWebSpeechFallback();
-        setUseWebSpeechFallback(isUsingFallback);
-      }
-    };
-    
-    checkFallbackStatus();
-  }, [isInitialized, testWebSpeechFallback]);
 
   // Check microphone permission on load
   useEffect(() => {
@@ -327,24 +313,11 @@ const MainScreen = ({ onNavigate }) => {
                 {!isInitialized ? (
                   <div className="text-gray-400 text-sm">Initializing voice activation...</div>
                 ) : isListening ? (
-                  <div className="text-blue-400 text-sm">
-                    🎤 Listening{useWebSpeechFallback ? ' (Web Speech API)' : ''}...
-                  </div>
+                  <div className="text-blue-400 text-sm">🎤 Listening...</div>
                 ) : (
-                  <div className="text-gray-400 text-sm">
-                    Ready to listen{useWebSpeechFallback ? ' (Web Speech API)' : ''}
-                  </div>
+                  <div className="text-gray-400 text-sm">Ready to listen</div>
                 )}
               </div>
-              
-              {/* Web Speech API fallback indicator */}
-              {useWebSpeechFallback && (
-                <div className="mt-2 p-2 bg-green-900/20 border border-green-500/30 rounded-lg">
-                  <p className="text-green-400 text-xs text-center">
-                    ✅ Using Web Speech API (same as RecordScreen)
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
