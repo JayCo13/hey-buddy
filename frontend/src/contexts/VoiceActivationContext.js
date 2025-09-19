@@ -100,7 +100,46 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           }, 2000); // Wait 2 seconds after greeting to start listening
         };
         
-        speechSynthesis.speak(utterance);
+        utterance.onerror = (event) => {
+          console.error('🎤 TTS Error:', event.error);
+          // On mobile, TTS might fail due to user interaction requirement
+          // Still start listening even if TTS fails
+          setTimeout(() => {
+            console.log('🎤 Starting listening after TTS error...');
+            if (useFallbackMode) {
+              startFallbackListeningRef.current();
+            } else {
+              voiceActivationService.startListening();
+            }
+          }, 1000);
+        };
+        
+        // Try to speak, but don't fail if it doesn't work on mobile
+        try {
+          speechSynthesis.speak(utterance);
+        } catch (ttsError) {
+          console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
+          // Still start listening even if TTS fails
+          setTimeout(() => {
+            console.log('🎤 Starting listening after TTS failure...');
+            if (useFallbackMode) {
+              startFallbackListeningRef.current();
+            } else {
+              voiceActivationService.startListening();
+            }
+          }, 1000);
+        }
+      } else {
+        console.warn('🎤 Speech synthesis not available');
+        // Start listening immediately if no TTS
+        setTimeout(() => {
+          console.log('🎤 Starting listening (no TTS)...');
+          if (useFallbackMode) {
+            startFallbackListeningRef.current();
+          } else {
+            voiceActivationService.startListening();
+          }
+        }, 1000);
       }
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
@@ -110,6 +149,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Start fallback listening using Web Speech API
   const startFallbackListening = useCallback(async () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.error('🎤 Speech recognition not supported');
+      setError('Speech recognition not supported on this device');
+      return;
+    }
+    
     const recognition = new SpeechRecognition();
     
     recognition.continuous = true;
@@ -144,6 +190,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         if (onNavigateToRecord) {
           console.log('🎤 Navigating to record room...');
           onNavigateToRecord();
+        } else {
+          console.error('🎤 onNavigateToRecord not available!');
         }
         
         // Trigger greeting speech
@@ -155,6 +203,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       console.error('Speech recognition error:', event.error);
       setError(`Speech recognition error: ${event.error}`);
       setIsListening(false);
+      
+      // Try to restart after error (except for certain fatal errors)
+      if (event.error !== 'not-allowed' && event.error !== 'service-not-allowed') {
+        setTimeout(() => {
+          console.log('🎤 Restarting recognition after error...');
+          recognition.start();
+        }, 2000);
+      }
     };
 
     recognition.onend = () => {
@@ -164,12 +220,19 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Restart if we're still supposed to be listening and no TTS is playing
       if (isListening && !speechSynthesis.speaking) {
         setTimeout(() => {
+          console.log('🎤 Restarting recognition...');
           recognition.start();
         }, 1000); // Longer delay to avoid TTS interference
       }
     };
 
-    recognition.start();
+    try {
+      recognition.start();
+      console.log('🎤 Started fallback recognition');
+    } catch (startError) {
+      console.error('🎤 Failed to start recognition:', startError);
+      setError(`Failed to start speech recognition: ${startError.message}`);
+    }
     
     // Store for cleanup
     window.fallbackRecognition = recognition;
@@ -402,12 +465,22 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   useEffect(() => {
     if (isInitialized && !greetingInitialized) {
       console.log('🎤 Voice activation initialized, triggering immediate greeting...');
-      // Small delay to ensure everything is ready
-      setTimeout(() => {
-        triggerGreetingSpeech();
-      }, 1000);
+      
+      // On mobile, we need user interaction for TTS, so start listening first
+      if (useFallbackMode) {
+        console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
+        // Start listening immediately on mobile
+        setTimeout(() => {
+          startFallbackListeningRef.current();
+        }, 500);
+      } else {
+        // Desktop: play greeting first
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 1000);
+      }
     }
-  }, [isInitialized, greetingInitialized, triggerGreetingSpeech]);
+  }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
 
   const value = {
     isListening,

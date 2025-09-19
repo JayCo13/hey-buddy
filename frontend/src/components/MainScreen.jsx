@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProfileScreen from './ProfileScreen';
 import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Signal, Wifi, Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
@@ -45,15 +45,35 @@ const MainScreen = ({ onNavigate }) => {
   };
 
   // Enable speech on first user interaction
-  const enableSpeech = async () => {
+  const enableSpeech = useCallback(async () => {
     if (!speechEnabled) {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Trigger greeting speech now that user has interacted
+      // Trigger greeting speech now that user has interacted (mobile TTS requirement)
       await triggerGreetingSpeech();
     }
-  };
+  }, [speechEnabled, triggerGreetingSpeech]);
+
+  // Handle any user interaction to enable mobile TTS
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (!speechEnabled) {
+        enableSpeech();
+      }
+    };
+
+    // Add event listeners for user interaction
+    document.addEventListener('touchstart', handleUserInteraction, { once: true });
+    document.addEventListener('click', handleUserInteraction, { once: true });
+    document.addEventListener('keydown', handleUserInteraction, { once: true });
+
+    return () => {
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [speechEnabled, enableSpeech]);
 
   // Check microphone permission on load
   useEffect(() => {
@@ -326,7 +346,10 @@ const MainScreen = ({ onNavigate }) => {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                     <p className="text-blue-400 text-xs">
-                      Mobile-optimized voice mode • Hands-free listening active
+                      {speechEnabled 
+                        ? 'Mobile-optimized voice mode • Hands-free listening active'
+                        : 'Tap anywhere to enable voice features'
+                      }
                     </p>
                   </div>
                 </div>
