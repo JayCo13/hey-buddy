@@ -13,7 +13,7 @@ export const useVoiceActivation = () => {
   return context;
 };
 
-export const VoiceActivationProvider = ({ children }) => {
+export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const [isListening, setIsListening] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0.05);
   const [error, setError] = useState(null);
@@ -53,127 +53,64 @@ export const VoiceActivationProvider = ({ children }) => {
     return { isMobile, hasLowMemory, supportsWASM };
   }, []);
 
-  // Initialize voice activation with fallback support
-  const initializeVoiceActivation = useCallback(async () => {
+  // Trigger greeting speech
+  const triggerGreetingSpeech = useCallback(async () => {
     try {
-      setShowLoading(true);
-      setError(null);
-
-      const capabilities = detectDeviceCapabilities();
+      console.log('🎤 Triggering greeting speech...');
+      const greeting = await greetingService.generateGreeting();
+      console.log('🎤 Greeting received:', greeting);
+      setCurrentGreeting(greeting);
+      setGreetingInitialized(true);
       
-      if (useFallbackMode || capabilities.hasLowMemory) {
-        console.log('🔄 Initializing fallback voice activation mode');
-        await initializeFallbackMode();
-      } else {
-        console.log('🚀 Initializing full WASM voice activation mode');
-        await initializeWASMMode();
-      }
-
-      setIsInitialized(true);
-      console.log('✅ Voice activation initialized successfully');
-      
-    } catch (err) {
-      console.error('❌ Voice activation initialization failed:', err);
-      
-      // Try fallback mode if WASM fails
-      if (!useFallbackMode) {
-        console.log('🔄 WASM failed, trying fallback mode...');
-        setUseFallbackMode(true);
-        try {
-          await initializeFallbackMode();
-          setIsInitialized(true);
-          console.log('✅ Fallback voice activation initialized successfully');
-        } catch (fallbackErr) {
-          console.error('❌ Fallback initialization also failed:', fallbackErr);
-          setError(`Voice activation initialization error: ${fallbackErr.message}`);
+      // Use TTS to speak the greeting
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(greeting);
+        utterance.rate = 0.9;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.8;
+        
+        // Pause voice activation during TTS
+        if (useFallbackMode) {
+          if (window.fallbackRecognition) {
+            window.fallbackRecognition.stop();
+          }
+        } else {
+          voiceActivationService.pauseVoiceActivation();
         }
-      } else {
-        setError(`Voice activation initialization error: ${err.message}`);
+        
+        utterance.onend = () => {
+          console.log('🎤 Greeting speech completed');
+          // Resume voice activation after TTS
+          if (useFallbackMode) {
+            setTimeout(() => {
+              startFallbackListening();
+            }, 1000);
+          } else {
+            voiceActivationService.resumeVoiceActivation();
+          }
+        };
+        
+        speechSynthesis.speak(utterance);
       }
-    } finally {
-      setShowLoading(false);
-    }
-  }, [useFallbackMode, detectDeviceCapabilities]);
-
-  // Initialize WASM mode (original implementation)
-  const initializeWASMMode = useCallback(async () => {
-    // Initialize Whisper service with progress tracking
-    await whisperService.initialize((progress) => {
-      console.log(`Whisper loading: ${progress.stage} - ${progress.message}`);
-    });
-
-    // Initialize voice activation service
-    const success = await voiceActivationService.initialize();
-    if (!success) {
-      throw new Error('Failed to initialize voice activation service');
-    }
-
-    // Set up callbacks
-    voiceActivationService.setWakeWordCallback((wakeWord, transcription) => {
-      console.log('🎤 Wake word detected:', wakeWord, transcription);
-      handleWakeWordDetected(wakeWord, transcription);
-    });
-
-    voiceActivationService.setAudioLevelCallback((level) => {
-      setAudioLevel(level);
-    });
-
-    voiceActivationService.setErrorCallback((error) => {
-      console.error('Voice activation error:', error);
-      setError(error);
-    });
-
-    voiceActivationService.setStatusCallback((status) => {
-      console.log('Voice activation status:', status);
-      if (status === 'listening') {
-        setIsListening(true);
-      } else if (status === 'ready') {
-        setIsListening(false);
-      }
-    });
-  }, []);
-
-  // Initialize fallback mode using Web Speech API
-  const initializeFallbackMode = useCallback(async () => {
-    // Check if Web Speech API is available
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      throw new Error('Speech recognition not supported on this device');
-    }
-
-    // Initialize basic microphone access for audio level monitoring
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000,
-          channelCount: 1
-        }
-      });
-
-      // Create audio context for level monitoring
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const analyser = audioContext.createAnalyser();
-      const microphone = audioContext.createMediaStreamSource(stream);
-      
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
-      microphone.connect(analyser);
-
-      // Store for cleanup
-      window.fallbackAudioContext = audioContext;
-      window.fallbackStream = stream;
-      window.fallbackAnalyser = analyser;
-
-      // Start audio level monitoring
-      startFallbackAudioLevelMonitoring(analyser);
-
-      console.log('✅ Fallback voice activation initialized');
     } catch (err) {
-      throw new Error(`Failed to initialize fallback mode: ${err.message}`);
+      console.error('Failed to trigger greeting speech:', err);
     }
-  }, []);
+  }, [useFallbackMode, startFallbackListening]);
+
+  // Handle wake word detection
+  const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
+    console.log('🎤 Wake word detected:', wakeWord, transcription);
+    setIsListening(false);
+    
+    // Navigate to record room
+    if (onNavigateToRecord) {
+      console.log('🎤 Navigating to record room...');
+      onNavigateToRecord();
+    }
+    
+    // Trigger greeting speech
+    await triggerGreetingSpeech();
+  }, [triggerGreetingSpeech, onNavigateToRecord]);
 
   // Start audio level monitoring for fallback mode
   const startFallbackAudioLevelMonitoring = useCallback((analyser) => {
@@ -206,32 +143,6 @@ export const VoiceActivationProvider = ({ children }) => {
     
     monitor();
   }, []);
-
-  // Handle wake word detection
-  const handleWakeWordDetected = useCallback(async (wakeWord, transcription) => {
-    console.log('🎤 Wake word detected:', wakeWord, transcription);
-    setIsListening(false);
-    
-    // Trigger greeting speech
-    await triggerGreetingSpeech();
-  }, []);
-
-  // Start listening with fallback support
-  const startListening = useCallback(async () => {
-    try {
-      if (useFallbackMode) {
-        await startFallbackListening();
-      } else {
-        const success = await voiceActivationService.startListening();
-        if (!success) {
-          throw new Error('Failed to start voice activation service');
-        }
-      }
-    } catch (err) {
-      console.error('Failed to start listening:', err);
-      setError(`Failed to start listening: ${err.message}`);
-    }
-  }, [useFallbackMode]);
 
   // Start fallback listening using Web Speech API
   const startFallbackListening = useCallback(async () => {
@@ -284,6 +195,149 @@ export const VoiceActivationProvider = ({ children }) => {
     window.fallbackRecognition = recognition;
   }, [isListening, handleWakeWordDetected]);
 
+  // Initialize fallback mode using Web Speech API
+  const initializeFallbackMode = useCallback(async () => {
+    // Check if Web Speech API is available
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      throw new Error('Speech recognition not supported on this device');
+    }
+
+    // Initialize basic microphone access for audio level monitoring
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000,
+          channelCount: 1
+        }
+      });
+
+      // Create audio context for level monitoring
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      const microphone = audioContext.createMediaStreamSource(stream);
+      
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      microphone.connect(analyser);
+
+      // Store for cleanup
+      window.fallbackAudioContext = audioContext;
+      window.fallbackStream = stream;
+      window.fallbackAnalyser = analyser;
+
+      // Start audio level monitoring
+      startFallbackAudioLevelMonitoring(analyser);
+
+      console.log('✅ Fallback voice activation initialized');
+    } catch (err) {
+      throw new Error(`Failed to initialize fallback mode: ${err.message}`);
+    }
+  }, [startFallbackAudioLevelMonitoring]);
+
+  // Initialize WASM mode (original implementation)
+  const initializeWASMMode = useCallback(async () => {
+    // Initialize Whisper service with progress tracking
+    await whisperService.initialize((progress) => {
+      console.log(`Whisper loading: ${progress.stage} - ${progress.message}`);
+    });
+
+    // Initialize voice activation service
+    const success = await voiceActivationService.initialize();
+    if (!success) {
+      throw new Error('Failed to initialize voice activation service');
+    }
+
+    // Set up callbacks
+    voiceActivationService.setWakeWordCallback((wakeWord, transcription) => {
+      console.log('🎤 Wake word detected:', wakeWord, transcription);
+      handleWakeWordDetected(wakeWord, transcription);
+    });
+
+    voiceActivationService.setAudioLevelCallback((level) => {
+      setAudioLevel(level);
+    });
+
+    voiceActivationService.setErrorCallback((error) => {
+      console.error('Voice activation error:', error);
+      setError(error);
+    });
+
+    voiceActivationService.setStatusCallback((status) => {
+      console.log('Voice activation status:', status);
+      if (status === 'listening') {
+        setIsListening(true);
+      } else if (status === 'ready') {
+        setIsListening(false);
+      }
+    });
+  }, [handleWakeWordDetected]);
+
+  // Initialize voice activation with fallback support
+  const initializeVoiceActivation = useCallback(async () => {
+    try {
+      setShowLoading(true);
+      setError(null);
+
+      // Initialize greeting service first
+      console.log('🎤 Initializing greeting service...');
+      await greetingService.initialize();
+
+      const capabilities = detectDeviceCapabilities();
+      
+      if (useFallbackMode || capabilities.hasLowMemory) {
+        console.log('🔄 Initializing fallback voice activation mode');
+        await initializeFallbackMode();
+      } else {
+        console.log('🚀 Initializing full WASM voice activation mode');
+        await initializeWASMMode();
+      }
+
+      setIsInitialized(true);
+      console.log('✅ Voice activation initialized successfully');
+      
+    } catch (err) {
+      console.error('❌ Voice activation initialization failed:', err);
+      
+      // Try fallback mode if WASM fails
+      if (!useFallbackMode) {
+        console.log('🔄 WASM failed, trying fallback mode...');
+        setUseFallbackMode(true);
+        try {
+          await initializeFallbackMode();
+          setIsInitialized(true);
+          console.log('✅ Fallback voice activation initialized successfully');
+        } catch (fallbackErr) {
+          console.error('❌ Fallback initialization also failed:', fallbackErr);
+          setError(`Voice activation initialization error: ${fallbackErr.message}`);
+        }
+      } else {
+        setError(`Voice activation initialization error: ${err.message}`);
+      }
+    } finally {
+      setShowLoading(false);
+    }
+  }, [useFallbackMode, detectDeviceCapabilities, initializeFallbackMode, initializeWASMMode]);
+
+  // Start listening with fallback support
+  const startListening = useCallback(async () => {
+    try {
+      if (useFallbackMode) {
+        await startFallbackListening();
+      } else {
+        const success = await voiceActivationService.startListening();
+        if (!success) {
+          throw new Error('Failed to start voice activation service');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to start listening:', err);
+      setError(`Failed to start listening: ${err.message}`);
+    }
+  }, [useFallbackMode, startFallbackListening]);
+
   // Stop listening
   const stopListening = useCallback(() => {
     if (useFallbackMode) {
@@ -295,47 +349,6 @@ export const VoiceActivationProvider = ({ children }) => {
       voiceActivationService.stopListening();
     }
     setIsListening(false);
-  }, [useFallbackMode]);
-
-  // Trigger greeting speech
-  const triggerGreetingSpeech = useCallback(async () => {
-    try {
-      const greeting = await greetingService.getGreeting();
-      setCurrentGreeting(greeting);
-      setGreetingInitialized(true);
-      
-      // Use TTS to speak the greeting
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(greeting);
-        utterance.rate = 0.9;
-        utterance.pitch = 1.0;
-        utterance.volume = 0.8;
-        
-        // Pause voice activation during TTS
-        if (useFallbackMode) {
-          if (window.fallbackRecognition) {
-            window.fallbackRecognition.stop();
-          }
-        } else {
-          voiceActivationService.pauseVoiceActivation();
-        }
-        
-        utterance.onend = () => {
-          // Resume voice activation after TTS
-          if (useFallbackMode) {
-            setTimeout(() => {
-              startFallbackListening();
-            }, 1000);
-          } else {
-            voiceActivationService.resumeVoiceActivation();
-          }
-        };
-        
-        speechSynthesis.speak(utterance);
-      }
-    } catch (err) {
-      console.error('Failed to trigger greeting speech:', err);
-    }
   }, [useFallbackMode]);
 
   // Initialize on mount
