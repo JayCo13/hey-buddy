@@ -165,6 +165,15 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     recognition.onstart = () => {
       console.log('🎤 Fallback speech recognition started');
       setIsListening(true);
+      
+      // Trigger greeting only after microphone permission is granted and listening starts
+      if (!greetingInitialized) {
+        console.log('🎤 Microphone permission granted, triggering greeting...');
+        setTimeout(() => {
+          triggerGreetingSpeech();
+          setGreetingInitialized(true);
+        }, 1000); // Small delay to ensure recognition is fully started
+      }
     };
 
     recognition.onresult = (event) => {
@@ -282,7 +291,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     
     // Store for cleanup
     window.fallbackRecognition = recognition;
-  }, [onNavigateToRecord]);
+  }, [onNavigateToRecord, greetingInitialized, triggerGreetingSpeech]);
 
   // Assign function to ref
   startFallbackListeningRef.current = startFallbackListening;
@@ -507,21 +516,50 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Trigger immediate greeting when initialized (only once)
   useEffect(() => {
     if (isInitialized && !greetingInitialized) {
-      console.log('🎤 Voice activation initialized, triggering immediate greeting...');
+      console.log('🎤 Voice activation initialized, checking microphone permission...');
       
-      // On mobile, we need user interaction for TTS, so start listening first
-      if (useFallbackMode) {
-        console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
-        // Start listening immediately on mobile
-        setTimeout(() => {
-          startFallbackListeningRef.current();
-        }, 500);
-      } else {
-        // Desktop: play greeting first
-        setTimeout(() => {
-          triggerGreetingSpeech();
-        }, 500); // Reduced delay for faster greeting
-      }
+      // Check if microphone permission is granted before triggering greeting
+      const checkMicrophonePermission = async () => {
+        try {
+          // Try to get microphone access to check permission
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log('🎤 Microphone permission granted, triggering greeting...');
+          
+          // Stop the test stream immediately
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Now trigger the greeting
+          if (useFallbackMode) {
+            console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
+            // Start listening immediately on mobile
+            setTimeout(() => {
+              startFallbackListeningRef.current();
+            }, 500);
+          } else {
+            // Desktop: play greeting first
+            setTimeout(() => {
+              triggerGreetingSpeech();
+            }, 500);
+          }
+          
+          setGreetingInitialized(true);
+        } catch (error) {
+          console.log('🎤 Microphone permission not granted yet, waiting for user interaction...');
+          
+          // On mobile, start listening anyway - greeting will play after permission is granted
+          if (useFallbackMode) {
+            console.log('🎤 Mobile mode: Starting listening, greeting will play after permission granted');
+            setTimeout(() => {
+              startFallbackListeningRef.current();
+            }, 500);
+          }
+          
+          // Don't mark as initialized yet - wait for permission
+          // The greeting will be triggered when permission is granted
+        }
+      };
+      
+      checkMicrophonePermission();
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
 
