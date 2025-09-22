@@ -66,89 +66,127 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       }
       
       console.log('🎤 Triggering greeting speech...');
-      const greetingObj = await greetingService.generateGreeting();
+      
+      // Add timeout to prevent hanging
+      const greetingPromise = greetingService.generateGreeting();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Greeting generation timeout')), 5000)
+      );
+      
+      const greetingObj = await Promise.race([greetingPromise, timeoutPromise]);
       console.log('🎤 Greeting received:', greetingObj);
       
       // Extract the text from the greeting object
       const greetingText = greetingObj.text || greetingObj;
       console.log('🎤 Greeting text:', greetingText);
       
+      // Validate greeting text
+      if (!greetingText || greetingText.trim().length === 0) {
+        console.error('🎤 Invalid greeting text received:', greetingText);
+        // Use a simple fallback greeting
+        const fallbackGreeting = `Hey ${greetingService.userName || 'buddy'}, good to see you!`;
+        console.log('🎤 Using fallback greeting:', fallbackGreeting);
+        setCurrentGreeting({ text: fallbackGreeting, emoji: '👋' });
+        setGreetingInitialized(true);
+        
+        // Speak the fallback greeting
+        speakGreeting(fallbackGreeting);
+        return;
+      }
+      
       setCurrentGreeting(greetingObj);
       setGreetingInitialized(true);
       
-      // Use TTS to speak the greeting
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(greetingText);
-        utterance.rate = 1.0; // Faster rate for smoother experience
-        utterance.pitch = 1.0;
-        utterance.volume = 0.9; // Higher volume for clarity
-        
-        // Pause voice activation during TTS
-        if (useFallbackMode) {
-          if (window.fallbackRecognition) {
-            window.fallbackRecognition.stop();
-            window.fallbackRecognition = null; // Clear reference to prevent restart
-          }
-      } else {
-          voiceActivationService.pauseVoiceActivation();
-        }
-        
-        utterance.onend = () => {
-          console.log('🎤 Greeting speech completed');
-          // Auto-start hands-free listening after greeting with shorter delay
-          setTimeout(() => {
-            console.log('🎤 Auto-starting hands-free listening...');
-            if (useFallbackMode) {
-              startFallbackListeningRef.current();
-            } else {
-              voiceActivationService.startListening();
-            }
-          }, 1000); // Reduced delay for smoother experience
-        };
-        
-        utterance.onerror = (event) => {
-          console.error('🎤 TTS Error:', event.error);
-          // On mobile, TTS might fail due to user interaction requirement
-          // Still start listening even if TTS fails
-          setTimeout(() => {
-            console.log('🎤 Starting listening after TTS error...');
-            if (useFallbackMode) {
-              startFallbackListeningRef.current();
-      } else {
-              voiceActivationService.startListening();
-            }
-          }, 500); // Faster recovery
-        };
-        
-        // Try to speak, but don't fail if it doesn't work on mobile
-        try {
-          speechSynthesis.speak(utterance);
-        } catch (ttsError) {
-          console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
-          // Still start listening even if TTS fails
-          setTimeout(() => {
-            console.log('🎤 Starting listening after TTS failure...');
-            if (useFallbackMode) {
-              startFallbackListeningRef.current();
-          } else {
-              voiceActivationService.startListening();
-          }
-          }, 500); // Faster recovery
+      // Speak the greeting
+      speakGreeting(greetingText);
+      
+    } catch (err) {
+      console.error('Failed to trigger greeting speech:', err);
+      
+      // Use a simple fallback greeting on error
+      const fallbackGreeting = `Hey ${greetingService.userName || 'buddy'}, good to see you!`;
+      console.log('🎤 Using error fallback greeting:', fallbackGreeting);
+      setCurrentGreeting({ text: fallbackGreeting, emoji: '👋' });
+      setGreetingInitialized(true);
+      
+      // Speak the fallback greeting
+      speakGreeting(fallbackGreeting);
+    }
+  }, [useFallbackMode, speakGreeting]);
+
+  // Helper function to speak greeting
+  const speakGreeting = useCallback((greetingText) => {
+    // Use TTS to speak the greeting
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(greetingText);
+      utterance.rate = 1.0; // Faster rate for smoother experience
+      utterance.pitch = 1.0;
+      utterance.volume = 0.9; // Higher volume for clarity
+      
+      // Pause voice activation during TTS
+      if (useFallbackMode) {
+        if (window.fallbackRecognition) {
+          window.fallbackRecognition.stop();
+          window.fallbackRecognition = null; // Clear reference to prevent restart
         }
       } else {
-        console.warn('🎤 Speech synthesis not available');
-        // Start listening immediately if no TTS
+        voiceActivationService.pauseVoiceActivation();
+      }
+      
+      utterance.onend = () => {
+        console.log('🎤 Greeting speech completed');
+        // Auto-start hands-free listening after greeting with shorter delay
         setTimeout(() => {
-          console.log('🎤 Starting listening (no TTS)...');
+          console.log('🎤 Auto-starting hands-free listening...');
           if (useFallbackMode) {
             startFallbackListeningRef.current();
           } else {
             voiceActivationService.startListening();
           }
-        }, 500); // Faster start
+        }, 1000); // Reduced delay for smoother experience
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('🎤 TTS Error:', event.error);
+        // On mobile, TTS might fail due to user interaction requirement
+        // Still start listening even if TTS fails
+        setTimeout(() => {
+          console.log('🎤 Starting listening after TTS error...');
+          if (useFallbackMode) {
+            startFallbackListeningRef.current();
+          } else {
+            voiceActivationService.startListening();
+          }
+        }, 500); // Faster recovery
+      };
+      
+      // Try to speak, but don't fail if it doesn't work on mobile
+      try {
+        speechSynthesis.speak(utterance);
+        console.log('🎤 Greeting speech started');
+      } catch (ttsError) {
+        console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
+        // Still start listening even if TTS fails
+        setTimeout(() => {
+          console.log('🎤 Starting listening after TTS failure...');
+          if (useFallbackMode) {
+            startFallbackListeningRef.current();
+          } else {
+            voiceActivationService.startListening();
+          }
+        }, 500); // Faster recovery
       }
-    } catch (err) {
-      console.error('Failed to trigger greeting speech:', err);
+    } else {
+      console.warn('🎤 Speech synthesis not available');
+      // Start listening immediately if no TTS
+      setTimeout(() => {
+        console.log('🎤 Starting listening (no TTS)...');
+        if (useFallbackMode) {
+          startFallbackListeningRef.current();
+        } else {
+          voiceActivationService.startListening();
+        }
+      }, 500); // Faster start
     }
   }, [useFallbackMode]);
 
