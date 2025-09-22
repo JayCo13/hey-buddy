@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Play, Pause, Home, User, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Mic, Play, Pause, Home, User, Volume2, VolumeX, ArrowLeft, Settings, AudioWaveform } from 'lucide-react';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import { useAIChat } from '../hooks/useAIChat';
+import Threads from '../effects/Threads';
+import ShinyText from '../effects/ShinyText';
 
 const RecordScreen = ({ onNavigate }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -13,10 +15,33 @@ const RecordScreen = ({ onNavigate }) => {
   
   const recordingIntervalRef = useRef(null);
   const lastSpokenIdRef = useRef(null);
+  const transcriptTimeoutRef = useRef(null);
 
   // Initialize AI chat and speech recognition
   const { messages, isProcessing, sendMessage, clearMessages } = useAIChat();
   
+  // Debounced transcript update to prevent rapid re-renders
+  const debouncedSetTranscript = useCallback((text, isFinal) => {
+    if (transcriptTimeoutRef.current) {
+      clearTimeout(transcriptTimeoutRef.current);
+    }
+    
+    if (isFinal) {
+      setCurrentTranscript(text);
+      if (text.trim()) {
+        // Auto-send after a brief pause when speech is final
+        setTimeout(() => {
+          handleSendMessage(text);
+        }, 500);
+      }
+    } else {
+      // Debounce interim results to reduce flashing
+      transcriptTimeoutRef.current = setTimeout(() => {
+        setCurrentTranscript(text);
+      }, 100);
+    }
+  }, []);
+
   const { 
     isListening, 
     transcript, 
@@ -28,15 +53,7 @@ const RecordScreen = ({ onNavigate }) => {
     continuous: true,
     interimResults: true,
     lang: "en-US",
-    onResult: (text, isFinal) => {
-      setCurrentTranscript(text);
-      if (isFinal && text.trim()) {
-        // Auto-send after a brief pause when speech is final
-        setTimeout(() => {
-          handleSendMessage(text);
-        }, 500);
-      }
-    },
+    onResult: debouncedSetTranscript,
     onError: (error) => {
       console.error("Speech recognition error:", error);
       alert(`Speech recognition error: ${error}`);
@@ -53,6 +70,18 @@ const RecordScreen = ({ onNavigate }) => {
   useEffect(() => {
     setIsSupported(speechSupported);
   }, [speechSupported]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (transcriptTimeoutRef.current) {
+        clearTimeout(transcriptTimeoutRef.current);
+      }
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Auto TTS for latest AI reply
   useEffect(() => {
@@ -77,18 +106,24 @@ const RecordScreen = ({ onNavigate }) => {
     lastSpokenIdRef.current = last.id;
   }, [messages]);
 
-  const handleStartRecording = async () => {
+  const handleStartRecording = useCallback(async () => {
     if (!isSupported) {
       alert("Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.");
       return;
     }
 
     if (isListening) {
+      // Stop recording
       stopListening();
       setIsRecording(false);
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
         recordingIntervalRef.current = null;
+      }
+      // Clear any pending transcript updates
+      if (transcriptTimeoutRef.current) {
+        clearTimeout(transcriptTimeoutRef.current);
+        transcriptTimeoutRef.current = null;
       }
     } else {
       try {
@@ -98,8 +133,11 @@ const RecordScreen = ({ onNavigate }) => {
           stream.getTracks().forEach((track) => track.stop());
         }
         
+        // Clear previous state
         resetTranscript();
         setCurrentTranscript("");
+        
+        // Start listening
         startListening({ continuousOverride: false });
         setIsRecording(true);
         
@@ -113,7 +151,7 @@ const RecordScreen = ({ onNavigate }) => {
         alert("Cannot access microphone. Please allow microphone permission in your browser.");
       }
     }
-  };
+  }, [isSupported, isListening, stopListening, resetTranscript, startListening]);
 
   const handleSendMessage = (message) => {
     const textToSend = message || currentTranscript;
@@ -154,104 +192,95 @@ const RecordScreen = ({ onNavigate }) => {
     onNavigate(tabId);
   };
 
+
+
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white relative overflow-hidden">
+      {/* Threads Background */}
+      <div className="absolute inset-0">
+        {useMemo(() => (
+          <Threads 
+            amplitude={2.5} 
+            distance={0.1} 
+            enableMouseInteraction={true} 
+          />
+        ), [])}
+      </div>
+      
       {/* Header */}
-      <div className="px-6 py-4">
-        <h1 className="text-2xl font-bold">Record Audio</h1>
-        <p className="text-gray-300 mt-2">Capture your voice and convert it to text</p>
+      <div className="relative z-10 flex items-center justify-between px-6 py-4 pt-12">
+        <button 
+          onClick={() => onNavigate('home')}
+          className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-white" />
+        </button>
+        
+        <ShinyText 
+          text="The real Jarvis" 
+          className="text-lg font-semibold text-white"
+          speed={3}
+        />
+        
+        <button className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors">
+          <Settings className="w-5 h-5 text-white" />
+        </button>
       </div>
 
-      {/* Main Recording Area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6">
-        {/* Recording Visualizer */}
-        <div className="mb-8">
-          <div className={`w-32 h-32 rounded-full flex items-center justify-center mb-6 transition-colors ${
-            isListening ? 'bg-red-600 animate-pulse' : 'bg-gray-800'
-          }`}>
-            <Mic className={`w-16 h-16 ${isListening ? 'text-white' : 'text-gray-300'}`} />
-          </div>
-          
-          {/* Audio Waveform */}
-          <div className="flex justify-center space-x-1">
-            {[...Array(12)].map((_, i) => (
-              <div 
-                key={i} 
-                className={`rounded-sm ${
-                  isListening ? 'bg-red-500 animate-pulse' : 'bg-gray-600'
-                }`}
-                style={{ 
-                  width: '4px', 
-                  height: `${Math.random() * 30 + 15}px`,
-                  animationDelay: `${i * 0.1}s`
-                }}
-              ></div>
-            ))}
+      {/* Timer Display */}
+      <div className="relative z-10 text-center mt-8">
+        <div className="text-4xl font-light text-white/90 tracking-wider">
+          {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 mt-18">
+        {/* Greeting with Transcript */}
+        <div className="text-center mb-16 w-full max-w-md">
+          {/* Live Transcription in greeting area */}
+          {currentTranscript && (
+            <div className="bg-black/30 backdrop-blur-sm rounded-xl p-4 border border-white/10 mt-4">
+              <h4 className="text-sm font-medium text-gray-300 mb-2">Live Transcription</h4>
+              <p className="text-white text-sm">{currentTranscript}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Audio Visualization Icon */}
+        <div className="mb-8 flex justify-center">
+          <div className="bg-black/30 backdrop-blur-sm rounded-full p-6 border border-white/10">
+            <AudioWaveform 
+              size={32} 
+              className={`text-blue-400 transition-all duration-300 ${isRecording ? 'animate-pulse' : ''}`} 
+            />
           </div>
         </div>
 
-        {/* Live Transcription */}
-        {currentTranscript && (
-          <div className="mb-6 w-full max-w-md">
-            <div className="bg-gray-800 rounded-xl p-4">
-              <h4 className="text-sm font-medium text-gray-400 mb-2">Live Transcription</h4>
-              <p className="text-white">{currentTranscript}</p>
-            </div>
-          </div>
-        )}
-
         {/* Processing Indicator */}
         {isProcessing && (
-          <div className="mb-6 w-full max-w-md">
-            <div className="bg-blue-800 rounded-xl p-4">
+          <div className="mb-8 w-full max-w-md">
+            <div className="bg-blue-900/30 backdrop-blur-sm rounded-xl p-4 border border-blue-500/20">
               <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span className="text-white">AI is thinking...</span>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+                <span className="text-blue-100">AI is thinking...</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Recording Controls */}
-        <div className="text-center">
-          <button
-            onClick={handleStartRecording}
-            className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${
-              isRecording 
-                ? 'bg-red-600 hover:bg-red-700' 
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {isRecording ? (
-              <Pause className="w-8 h-8 text-white" />
-            ) : (
-              <Play className="w-8 h-8 text-white" />
-            )}
-          </button>
-          
-          <p className="text-gray-300 mt-4 text-lg">
-            {isRecording ? 'Recording...' : 'Tap to start recording'}
-          </p>
-          
-          {isRecording && (
-            <p className="text-blue-400 mt-2 font-mono text-xl">
-              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-            </p>
-          )}
-        </div>
-
-        {/* Recording Controls */}
+        {/* Recording Control Button */}
         <div className="text-center">
           <button
             onClick={handleStartRecording}
             disabled={!isSupported}
-            className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${
+            className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-105 ${
               isListening 
-                ? 'bg-red-600 hover:bg-red-700' 
+                ? 'bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm border border-white/20' 
                 : isSupported
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-gray-600 cursor-not-allowed'
-            }`}
+                ? 'bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm border border-white/20'
+                : 'bg-gray-600/50 cursor-not-allowed border border-gray-500/20'
+            } shadow-2xl`}
           >
             {isListening ? (
               <Pause className="w-8 h-8 text-white" />
@@ -259,39 +288,25 @@ const RecordScreen = ({ onNavigate }) => {
               <Play className="w-8 h-8 text-white" />
             )}
           </button>
-          
-          <p className="text-gray-300 mt-4 text-lg">
-            {!isSupported 
-              ? 'Speech recognition not supported' 
-              : isListening 
-              ? 'Recording...' 
-              : 'Tap to start recording'}
-          </p>
-          
-          {isListening && (
-            <p className="text-red-400 mt-2 font-mono text-xl">
-              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-            </p>
-          )}
         </div>
 
         {/* Conversation History */}
         {messages.length > 0 && (
-          <div className="mt-8 w-full max-w-2xl">
+          <div className="w-full max-w-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Conversation</h3>
+              <h3 className="text-lg font-semibold text-white/90">Conversation</h3>
               <div className="flex items-center space-x-2">
                 {isSpeaking && (
                   <button
                     onClick={stopSpeaking}
-                    className="w-8 h-8 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center transition-colors"
+                    className="w-8 h-8 bg-red-600/80 hover:bg-red-700/80 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors"
                   >
                     <VolumeX className="w-4 h-4 text-white" />
                   </button>
                 )}
                 <button
                   onClick={clearMessages}
-                  className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
+                  className="px-3 py-1 bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm rounded-lg text-sm transition-colors border border-white/10"
                 >
                   Clear
                 </button>
@@ -299,10 +314,10 @@ const RecordScreen = ({ onNavigate }) => {
             </div>
             <div className="space-y-3 max-h-64 overflow-y-auto">
               {messages.map((message) => (
-                <div key={message.id} className={`rounded-xl p-4 ${
+                <div key={message.id} className={`rounded-xl p-4 backdrop-blur-sm border ${
                   message.type === 'user' 
-                    ? 'bg-blue-800 ml-8' 
-                    : 'bg-gray-800 mr-8'
+                    ? 'bg-blue-900/30 ml-8 border-blue-500/20' 
+                    : 'bg-gray-800/30 mr-8 border-white/10'
                 }`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -314,7 +329,7 @@ const RecordScreen = ({ onNavigate }) => {
                     {message.type === 'ai' && (
                       <button
                         onClick={() => speakMessage(message.content)}
-                        className="w-8 h-8 bg-gray-700 hover:bg-gray-600 rounded-full flex items-center justify-center transition-colors ml-2"
+                        className="w-8 h-8 bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ml-2 border border-white/10"
                       >
                         <Volume2 className="w-4 h-4 text-gray-300" />
                       </button>
@@ -328,7 +343,7 @@ const RecordScreen = ({ onNavigate }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-gray-800/80 backdrop-blur-xl border-t border-gray-600/30 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-gray-800/80 backdrop-blur-xl border-t border-gray-600/30 shadow-2xl z-20">
         <div className="flex items-center justify-around py-3">
           {[
             { id: 'home', label: 'Home', icon: Home },

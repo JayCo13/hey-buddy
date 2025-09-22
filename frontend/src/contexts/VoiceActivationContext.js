@@ -177,12 +177,52 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         return;
       }
       
-      // Check for wake word
-      if (transcript.includes('hey buddy') || transcript.includes('hey bud')) {
-        console.log('🎤 Wake word detected via fallback!');
+      // Check for wake word variations (matching the main service)
+      const wakeWordVariations = [
+        // Original "hey buddy" variations
+        'hey buddy',
+        'hey bud',
+        'buddy',
+        'hey',
+        'buddy hey',
+        // New "Hi there!" variations
+        'hi there',
+        'hi there!',
+        'hi',
+        'there',
+        'hello there',
+        'hey there',
+        // New "What's up?" variations
+        "what's up",
+        "what's up?",
+        "whats up",
+        "whats up?",
+        "what up",
+        "what up?",
+        "sup",
+        "wassup",
+        "what is up"
+      ];
+      
+      const detectedVariation = wakeWordVariations.find(variation => 
+        transcript.includes(variation)
+      );
+      
+      if (detectedVariation) {
+        console.log(`🎤 Wake word detected via fallback! Variation: "${detectedVariation}" in "${transcript}"`);
         recognition.stop();
-        // Call wake word handler directly to avoid circular dependency
-        console.log('🎤 Wake word detected:', 'Hey Buddy', transcript);
+        
+        // Determine which wake word category was detected
+        let wakeWordCategory = 'Voice Assistant';
+        if (detectedVariation.includes('buddy') || detectedVariation.includes('hey')) {
+          wakeWordCategory = 'Hey Buddy';
+        } else if (detectedVariation.includes('hi') || detectedVariation.includes('there') || detectedVariation.includes('hello')) {
+          wakeWordCategory = 'Hi There';
+        } else if (detectedVariation.includes('up') || detectedVariation.includes('sup') || detectedVariation.includes('what')) {
+          wakeWordCategory = "What's Up";
+        }
+        
+        console.log('🎤 Wake word detected:', wakeWordCategory, transcript);
         setIsListening(false);
         
         // Navigate to record room

@@ -1,6 +1,7 @@
 /**
  * Voice Activation Service
- * Handles microphone access, audio processing, and wake word detection using Whisper
+ * Handles microphone access, audio processing, and multiple wake word detection using Whisper
+ * Supports wake words: "Hey Buddy", "Hi there!", "What's up?"
  */
 
 import whisperService from './whisperService';
@@ -16,7 +17,7 @@ class VoiceActivationService {
     this.mediaRecorder = null;
     this.audioChunks = [];
     this.processingInterval = null;
-    this.wakeWord = 'hey buddy';
+    this.wakeWords = ['hey buddy', 'hi there', "what's up"]; // Support multiple wake words
     this.callbacks = {
       onWakeWordDetected: null,
       onAudioLevelChange: null,
@@ -486,11 +487,29 @@ class VoiceActivationService {
       
       // Check for wake word variations
       const wakeWordVariations = [
+        // Original "hey buddy" variations
         'hey buddy',
         'hey bud',
         'buddy',
         'hey',
-        'buddy hey'
+        'buddy hey',
+        // New "Hi there!" variations
+        'hi there',
+        'hi there!',
+        'hi',
+        'there',
+        'hello there',
+        'hey there',
+        // New "What's up?" variations
+        "what's up",
+        "what's up?",
+        "whats up",
+        "whats up?",
+        "what up",
+        "what up?",
+        "sup",
+        "wassup",
+        "what is up"
       ];
       
       const lowerTranscription = filteredTranscription.toLowerCase();
@@ -501,7 +520,18 @@ class VoiceActivationService {
       if (detectedVariation) {
         console.log(`🎤 Wake word detected! Variation: "${detectedVariation}" in "${filteredTranscription}"`);
         this.notifyStatusChange('wake_word_detected');
-        this.notifyWakeWordDetected('Hey Buddy', filteredTranscription);
+        
+        // Determine which wake word category was detected
+        let wakeWordCategory = 'Voice Assistant';
+        if (detectedVariation.includes('buddy') || detectedVariation.includes('hey')) {
+          wakeWordCategory = 'Hey Buddy';
+        } else if (detectedVariation.includes('hi') || detectedVariation.includes('there') || detectedVariation.includes('hello')) {
+          wakeWordCategory = 'Hi There';
+        } else if (detectedVariation.includes('up') || detectedVariation.includes('sup') || detectedVariation.includes('what')) {
+          wakeWordCategory = "What's Up";
+        }
+        
+        this.notifyWakeWordDetected(wakeWordCategory, filteredTranscription);
       } else {
         console.log('🎤 No wake word variation found in:', filteredTranscription);
       }
