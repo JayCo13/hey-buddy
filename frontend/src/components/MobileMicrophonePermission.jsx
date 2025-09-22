@@ -34,9 +34,6 @@ const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied })
         localStorage.setItem('microphonePermissionGranted', 'true');
         localStorage.setItem('microphonePermissionTime', Date.now().toString());
         
-        // Dispatch custom event to notify other components
-        window.dispatchEvent(new CustomEvent('microphonePermissionGranted'));
-        
         onPermissionGranted();
       } else {
         throw new Error('No audio tracks available');

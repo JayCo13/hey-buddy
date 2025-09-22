@@ -55,26 +55,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     return { isMobile, hasLowMemory, supportsWASM };
   }, []);
 
-  // Trigger greeting when microphone permission is granted
-  const triggerGreetingAfterPermission = useCallback(async () => {
-    if (isInitialized && !greetingInitialized) {
-      console.log('🎤 Microphone permission granted, triggering greeting...');
-      
-      if (useFallbackMode) {
-        console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
-        // Start listening immediately on mobile
-        setTimeout(() => {
-          startFallbackListeningRef.current();
-        }, 500);
-      } else {
-        // Desktop: play greeting first
-        setTimeout(() => {
-          triggerGreetingSpeech();
-        }, 500); // Reduced delay for faster greeting
-      }
-    }
-  }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
-
   // Trigger greeting speech
   const triggerGreetingSpeech = useCallback(async () => {
     try {
@@ -527,50 +507,21 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Trigger immediate greeting when initialized (only once)
   useEffect(() => {
     if (isInitialized && !greetingInitialized) {
-      console.log('🎤 Voice activation initialized, checking microphone permission...');
+      console.log('🎤 Voice activation initialized, triggering immediate greeting...');
       
-      // Check microphone permission before starting greeting
-      const checkMicrophonePermission = async () => {
-        try {
-          // Check if we have stored permission
-          const permissionGranted = localStorage.getItem('microphonePermissionGranted');
-          const permissionTime = localStorage.getItem('microphonePermissionTime');
-          
-          // If permission is older than 24 hours, re-request
-          if (permissionTime && Date.now() - parseInt(permissionTime) > 24 * 60 * 60 * 1000) {
-            localStorage.removeItem('microphonePermissionGranted');
-            localStorage.removeItem('microphonePermissionTime');
-            console.log('🎤 Microphone permission expired, waiting for user to grant permission');
-            return;
-          }
-
-          // If no permission, wait for user to grant it
-          if (!permissionGranted) {
-            console.log('🎤 No microphone permission, waiting for user to grant permission');
-            return;
-          }
-
-          // Permission is granted, proceed with greeting
-          console.log('🎤 Microphone permission granted, triggering greeting...');
-          
-          if (useFallbackMode) {
-            console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
-            // Start listening immediately on mobile
-            setTimeout(() => {
-              startFallbackListeningRef.current();
-            }, 500);
+      // On mobile, we need user interaction for TTS, so start listening first
+      if (useFallbackMode) {
+        console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
+        // Start listening immediately on mobile
+        setTimeout(() => {
+          startFallbackListeningRef.current();
+        }, 500);
       } else {
-            // Desktop: play greeting first
-            setTimeout(() => {
-              triggerGreetingSpeech();
-            }, 500); // Reduced delay for faster greeting
+        // Desktop: play greeting first
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 500); // Reduced delay for faster greeting
       }
-    } catch (error) {
-          console.error('🎤 Error checking microphone permission:', error);
-        }
-      };
-
-      checkMicrophonePermission();
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
 
@@ -608,7 +559,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     startListening,
     stopListening,
     triggerGreetingSpeech,
-    triggerGreetingAfterPermission,
     initializeVoiceActivation
   };
 
