@@ -77,35 +77,6 @@ const MainScreen = ({ onNavigate }) => {
     };
   }, [speechEnabled, enableSpeech]);
 
-  // Check microphone permission on load
-  useEffect(() => {
-    const checkMicrophonePermission = async () => {
-      try {
-        // Check if we have stored permission
-        const permissionGranted = localStorage.getItem('microphonePermissionGranted');
-        const permissionTime = localStorage.getItem('microphonePermissionTime');
-        
-        // If permission is older than 24 hours, re-request
-        if (permissionTime && Date.now() - parseInt(permissionTime) > 24 * 60 * 60 * 1000) {
-          localStorage.removeItem('microphonePermissionGranted');
-          localStorage.removeItem('microphonePermissionTime');
-        }
-
-        // If no permission or permission expired, show appropriate modal
-        if (!permissionGranted) {
-          // Small delay to let the app load first
-          setTimeout(() => {
-            // Hands-free mode - no need to show permission modal
-          }, 2000);
-        }
-      } catch (error) {
-        console.error('Error checking microphone permission:', error);
-      }
-    };
-
-    checkMicrophonePermission();
-  }, []);
-
   // Auto-enable speech on first user interaction (optimized)
   useEffect(() => {
     let hasTriggered = false;
