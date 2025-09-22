@@ -58,15 +58,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Trigger greeting speech
   const triggerGreetingSpeech = useCallback(async () => {
     try {
-      // Additional check: Don't trigger greeting on mobile if permission not granted
-      if (useFallbackMode) {
-        const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
-        if (!permissionGranted) {
-          console.log('🎤 Mobile: Skipping greeting - microphone permission not granted');
-          return;
-        }
-      }
-      
       console.log('🎤 Triggering greeting speech...');
       const greetingObj = await greetingService.generateGreeting();
       console.log('🎤 Greeting received:', greetingObj);
@@ -533,9 +524,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         try {
           // Check if we have permission stored locally
           const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
-          console.log('🎤 Permission check - localStorage value:', localStorage.getItem('microphonePermissionGranted'));
-          console.log('🎤 Permission check - permissionGranted:', permissionGranted);
-          console.log('🎤 Permission check - useFallbackMode:', useFallbackMode);
           
           if (permissionGranted) {
             console.log('🎤 Microphone permission already granted, triggering greeting...');
@@ -543,7 +531,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             setTimeout(() => {
               triggerGreetingSpeech();
             }, 500);
-          } else {
+      } else {
             console.log('🎤 Microphone permission not granted, waiting for user interaction...');
             // On mobile, start listening first but don't play greeting yet
             if (useFallbackMode) {
@@ -551,25 +539,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
               setTimeout(() => {
                 startFallbackListeningRef.current();
               }, 500);
-            } else {
-              // Desktop mode - play greeting immediately
-              console.log('🎤 Desktop mode: Playing greeting immediately');
-              setTimeout(() => {
-                triggerGreetingSpeech();
-              }, 500);
             }
-          }
-        } catch (error) {
+      }
+    } catch (error) {
           console.error('🎤 Error checking microphone permission:', error);
           // If there's an error, assume we need permission
           if (useFallbackMode) {
             setTimeout(() => {
               startFallbackListeningRef.current();
-            }, 500);
-          } else {
-            // Desktop mode - play greeting even if there's an error
-            setTimeout(() => {
-              triggerGreetingSpeech();
             }, 500);
           }
         }
