@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
 import { Mic, AlertCircle } from 'lucide-react';
-import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 
 const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied }) => {
   const [isRequesting, setIsRequesting] = useState(false);
   const [error, setError] = useState(null);
-  const { triggerGreetingAfterPermission } = useVoiceActivation();
 
   const requestMicrophonePermission = async () => {
     setIsRequesting(true);
@@ -36,8 +34,8 @@ const MobileMicrophonePermission = ({ onPermissionGranted, onPermissionDenied })
         localStorage.setItem('microphonePermissionGranted', 'true');
         localStorage.setItem('microphonePermissionTime', Date.now().toString());
         
-        // Trigger greeting after permission is granted
-        triggerGreetingAfterPermission();
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('microphonePermissionGranted'));
         
         onPermissionGranted();
       } else {

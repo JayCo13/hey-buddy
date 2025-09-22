@@ -55,174 +55,115 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     return { isMobile, hasLowMemory, supportsWASM };
   }, []);
 
+  // Trigger greeting when microphone permission is granted
+  const triggerGreetingAfterPermission = useCallback(async () => {
+    if (isInitialized && !greetingInitialized) {
+      console.log('🎤 Microphone permission granted, triggering greeting...');
+      
+      if (useFallbackMode) {
+        console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
+        // Start listening immediately on mobile
+        setTimeout(() => {
+          startFallbackListeningRef.current();
+        }, 500);
+      } else {
+        // Desktop: play greeting first
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 500); // Reduced delay for faster greeting
+      }
+    }
+  }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
+
   // Trigger greeting speech
   const triggerGreetingSpeech = useCallback(async () => {
     try {
-      // Safety check: Don't trigger greeting if permission not granted
-      const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
-      if (!permissionGranted) {
-        console.log('🎤 Safety check: Skipping greeting - microphone permission not granted');
-        return;
-      }
-      
       console.log('🎤 Triggering greeting speech...');
-      
-      // Add timeout to prevent hanging
-      const greetingPromise = greetingService.generateGreeting();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Greeting generation timeout')), 5000)
-      );
-      
-      const greetingObj = await Promise.race([greetingPromise, timeoutPromise]);
+      const greetingObj = await greetingService.generateGreeting();
       console.log('🎤 Greeting received:', greetingObj);
       
       // Extract the text from the greeting object
       const greetingText = greetingObj.text || greetingObj;
       console.log('🎤 Greeting text:', greetingText);
       
-      // Validate greeting text
-      if (!greetingText || greetingText.trim().length === 0) {
-        console.error('🎤 Invalid greeting text received:', greetingText);
-        // Use a simple fallback greeting
-        const fallbackGreeting = `Hey ${greetingService.userName || 'buddy'}, good to see you!`;
-        console.log('🎤 Using fallback greeting:', fallbackGreeting);
-        setCurrentGreeting({ text: fallbackGreeting, emoji: '👋' });
-        setGreetingInitialized(true);
-        
-        // Speak the fallback greeting
-        speakGreeting(fallbackGreeting);
-        return;
-      }
-      
       setCurrentGreeting(greetingObj);
       setGreetingInitialized(true);
       
-      // Speak the greeting
-      speakGreeting(greetingText);
-      
-    } catch (err) {
-      console.error('Failed to trigger greeting speech:', err);
-      
-      // Use a simple fallback greeting on error
-      const fallbackGreeting = `Hey ${greetingService.userName || 'buddy'}, good to see you!`;
-      console.log('🎤 Using error fallback greeting:', fallbackGreeting);
-      setCurrentGreeting({ text: fallbackGreeting, emoji: '👋' });
-      setGreetingInitialized(true);
-      
-      // Speak the fallback greeting
-      speakGreeting(fallbackGreeting);
-    }
-  }, [useFallbackMode, speakGreeting]);
-
-  // Helper function to speak greeting
-  const speakGreeting = useCallback((greetingText) => {
-    // Use TTS to speak the greeting
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(greetingText);
-      utterance.rate = 1.0; // Faster rate for smoother experience
-      utterance.pitch = 1.0;
-      utterance.volume = 0.9; // Higher volume for clarity
-      
-      // Pause voice activation during TTS
-      if (useFallbackMode) {
-        if (window.fallbackRecognition) {
-          window.fallbackRecognition.stop();
-          window.fallbackRecognition = null; // Clear reference to prevent restart
+      // Use TTS to speak the greeting
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(greetingText);
+        utterance.rate = 1.0; // Faster rate for smoother experience
+        utterance.pitch = 1.0;
+        utterance.volume = 0.9; // Higher volume for clarity
+        
+        // Pause voice activation during TTS
+        if (useFallbackMode) {
+          if (window.fallbackRecognition) {
+            window.fallbackRecognition.stop();
+            window.fallbackRecognition = null; // Clear reference to prevent restart
+          }
+      } else {
+          voiceActivationService.pauseVoiceActivation();
+        }
+        
+        utterance.onend = () => {
+          console.log('🎤 Greeting speech completed');
+          // Auto-start hands-free listening after greeting with shorter delay
+          setTimeout(() => {
+            console.log('🎤 Auto-starting hands-free listening...');
+            if (useFallbackMode) {
+              startFallbackListeningRef.current();
+            } else {
+              voiceActivationService.startListening();
+            }
+          }, 1000); // Reduced delay for smoother experience
+        };
+        
+        utterance.onerror = (event) => {
+          console.error('🎤 TTS Error:', event.error);
+          // On mobile, TTS might fail due to user interaction requirement
+          // Still start listening even if TTS fails
+          setTimeout(() => {
+            console.log('🎤 Starting listening after TTS error...');
+            if (useFallbackMode) {
+              startFallbackListeningRef.current();
+      } else {
+              voiceActivationService.startListening();
+            }
+          }, 500); // Faster recovery
+        };
+        
+        // Try to speak, but don't fail if it doesn't work on mobile
+        try {
+          speechSynthesis.speak(utterance);
+        } catch (ttsError) {
+          console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
+          // Still start listening even if TTS fails
+          setTimeout(() => {
+            console.log('🎤 Starting listening after TTS failure...');
+            if (useFallbackMode) {
+              startFallbackListeningRef.current();
+          } else {
+              voiceActivationService.startListening();
+          }
+          }, 500); // Faster recovery
         }
       } else {
-        voiceActivationService.pauseVoiceActivation();
+        console.warn('🎤 Speech synthesis not available');
+        // Start listening immediately if no TTS
+        setTimeout(() => {
+          console.log('🎤 Starting listening (no TTS)...');
+          if (useFallbackMode) {
+            startFallbackListeningRef.current();
+          } else {
+            voiceActivationService.startListening();
+          }
+        }, 500); // Faster start
       }
-      
-      utterance.onend = () => {
-        console.log('🎤 Greeting speech completed');
-        // Auto-start hands-free listening after greeting with shorter delay
-        setTimeout(() => {
-          console.log('🎤 Auto-starting hands-free listening...');
-          if (useFallbackMode) {
-            startFallbackListeningRef.current();
-          } else {
-            voiceActivationService.startListening();
-          }
-        }, 1000); // Reduced delay for smoother experience
-      };
-      
-      utterance.onerror = (event) => {
-        console.error('🎤 TTS Error:', event.error);
-        // On mobile, TTS might fail due to user interaction requirement
-        // Still start listening even if TTS fails
-        setTimeout(() => {
-          console.log('🎤 Starting listening after TTS error...');
-          if (useFallbackMode) {
-            startFallbackListeningRef.current();
-          } else {
-            voiceActivationService.startListening();
-          }
-        }, 500); // Faster recovery
-      };
-      
-      // Try to speak, but don't fail if it doesn't work on mobile
-      try {
-        speechSynthesis.speak(utterance);
-        console.log('🎤 Greeting speech started');
-      } catch (ttsError) {
-        console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
-        // Still start listening even if TTS fails
-        setTimeout(() => {
-          console.log('🎤 Starting listening after TTS failure...');
-          if (useFallbackMode) {
-            startFallbackListeningRef.current();
-          } else {
-            voiceActivationService.startListening();
-          }
-        }, 500); // Faster recovery
-      }
-    } else {
-      console.warn('🎤 Speech synthesis not available');
-      // Start listening immediately if no TTS
-      setTimeout(() => {
-        console.log('🎤 Starting listening (no TTS)...');
-        if (useFallbackMode) {
-          startFallbackListeningRef.current();
-        } else {
-          voiceActivationService.startListening();
-        }
-      }, 500); // Faster start
+    } catch (err) {
+      console.error('Failed to trigger greeting speech:', err);
     }
   }, [useFallbackMode]);
-
-  // Function to trigger greeting when microphone permission is granted
-  const triggerGreetingAfterPermission = useCallback(() => {
-    console.log('🎤 Microphone permission granted, triggering greeting...');
-    if (!greetingInitialized) {
-      setTimeout(() => {
-        triggerGreetingSpeech();
-      }, 500);
-    }
-  }, [greetingInitialized, triggerGreetingSpeech]);
-
-  // Listen for permission changes
-  useEffect(() => {
-    const handlePermissionChange = () => {
-      const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
-      if (permissionGranted && !greetingInitialized) {
-        console.log('🎤 Permission change detected, triggering greeting...');
-        setTimeout(() => {
-          triggerGreetingSpeech();
-        }, 500);
-      }
-    };
-
-    // Listen for storage changes (when permission is granted in another tab)
-    window.addEventListener('storage', handlePermissionChange);
-    
-    // Also listen for focus events to check permission status
-    window.addEventListener('focus', handlePermissionChange);
-
-    return () => {
-      window.removeEventListener('storage', handlePermissionChange);
-      window.removeEventListener('focus', handlePermissionChange);
-    };
-  }, [greetingInitialized, triggerGreetingSpeech]);
 
   // Start fallback listening using Web Speech API
   const startFallbackListening = useCallback(async () => {
@@ -583,55 +524,52 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     };
   }, [initializeVoiceActivation, useFallbackMode]);
 
-  // Trigger greeting only after microphone permission is granted
+  // Trigger immediate greeting when initialized (only once)
   useEffect(() => {
     if (isInitialized && !greetingInitialized) {
       console.log('🎤 Voice activation initialized, checking microphone permission...');
       
-      // Check if microphone permission is already granted
+      // Check microphone permission before starting greeting
       const checkMicrophonePermission = async () => {
         try {
-          // Check if we have permission stored locally
-          const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
+          // Check if we have stored permission
+          const permissionGranted = localStorage.getItem('microphonePermissionGranted');
+          const permissionTime = localStorage.getItem('microphonePermissionTime');
           
-          if (permissionGranted) {
-            console.log('🎤 Microphone permission already granted, triggering greeting...');
-            // Permission already granted, play greeting immediately
-            setTimeout(() => {
-              triggerGreetingSpeech();
-            }, 500);
-          } else {
-            console.log('🎤 Microphone permission not granted, waiting for user interaction...');
-            // Don't play greeting yet - wait for permission on both mobile and desktop
-            if (useFallbackMode) {
-              console.log('🎤 Mobile mode: Starting listening first, greeting will play after permission granted');
-              setTimeout(() => {
-                startFallbackListeningRef.current();
-              }, 500);
-      } else {
-              console.log('🎤 Desktop mode: Waiting for microphone permission before greeting');
-              // On desktop, we can still start listening but won't greet until permission is granted
-              setTimeout(() => {
-                startListening();
-              }, 500);
-            }
-      }
-    } catch (error) {
-          console.error('🎤 Error checking microphone permission:', error);
-          // If there's an error, assume we need permission - don't play greeting
+          // If permission is older than 24 hours, re-request
+          if (permissionTime && Date.now() - parseInt(permissionTime) > 24 * 60 * 60 * 1000) {
+            localStorage.removeItem('microphonePermissionGranted');
+            localStorage.removeItem('microphonePermissionTime');
+            console.log('🎤 Microphone permission expired, waiting for user to grant permission');
+            return;
+          }
+
+          // If no permission, wait for user to grant it
+          if (!permissionGranted) {
+            console.log('🎤 No microphone permission, waiting for user to grant permission');
+            return;
+          }
+
+          // Permission is granted, proceed with greeting
+          console.log('🎤 Microphone permission granted, triggering greeting...');
+          
           if (useFallbackMode) {
+            console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
+            // Start listening immediately on mobile
             setTimeout(() => {
               startFallbackListeningRef.current();
             }, 500);
-          } else {
-            console.log('🎤 Desktop mode: Error checking permission, waiting for user interaction');
+      } else {
+            // Desktop: play greeting first
             setTimeout(() => {
-              startListening();
-            }, 500);
-          }
+              triggerGreetingSpeech();
+            }, 500); // Reduced delay for faster greeting
+      }
+    } catch (error) {
+          console.error('🎤 Error checking microphone permission:', error);
         }
       };
-      
+
       checkMicrophonePermission();
     }
   }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);

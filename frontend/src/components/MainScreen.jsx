@@ -20,6 +20,7 @@ const MainScreen = ({ onNavigate }) => {
     currentGreeting,
     greetingInitialized,
     triggerGreetingSpeech,
+    triggerGreetingAfterPermission,
     useFallbackMode
   } = useVoiceActivation();
 
@@ -56,6 +57,12 @@ const MainScreen = ({ onNavigate }) => {
       }
     }
   }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
+
+  // Handle microphone permission granted
+  const handleMicrophonePermissionGranted = useCallback(() => {
+    console.log('Microphone permission granted, triggering greeting...');
+    triggerGreetingAfterPermission();
+  }, [triggerGreetingAfterPermission]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -97,6 +104,10 @@ const MainScreen = ({ onNavigate }) => {
           setTimeout(() => {
             // Hands-free mode - no need to show permission modal
           }, 2000);
+        } else {
+          // Permission is granted, trigger greeting
+          console.log('Microphone permission already granted, triggering greeting...');
+          handleMicrophonePermissionGranted();
         }
       } catch (error) {
         console.error('Error checking microphone permission:', error);
@@ -104,7 +115,29 @@ const MainScreen = ({ onNavigate }) => {
     };
 
     checkMicrophonePermission();
-  }, []);
+  }, [handleMicrophonePermissionGranted]);
+
+  // Listen for microphone permission changes
+  useEffect(() => {
+    const handlePermissionChange = () => {
+      const permissionGranted = localStorage.getItem('microphonePermissionGranted');
+      if (permissionGranted && isInitialized && !greetingInitialized) {
+        console.log('Microphone permission granted dynamically, triggering greeting...');
+        handleMicrophonePermissionGranted();
+      }
+    };
+
+    // Listen for storage changes (when permission is granted in another tab)
+    window.addEventListener('storage', handlePermissionChange);
+    
+    // Also listen for custom events
+    window.addEventListener('microphonePermissionGranted', handlePermissionChange);
+
+    return () => {
+      window.removeEventListener('storage', handlePermissionChange);
+      window.removeEventListener('microphonePermissionGranted', handlePermissionChange);
+    };
+  }, [isInitialized, greetingInitialized, handleMicrophonePermissionGranted]);
 
   // Auto-enable speech on first user interaction (optimized)
   useEffect(() => {
