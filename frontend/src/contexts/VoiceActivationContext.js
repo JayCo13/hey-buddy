@@ -82,7 +82,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             window.fallbackRecognition.stop();
             window.fallbackRecognition = null; // Clear reference to prevent restart
           }
-        } else {
+      } else {
           voiceActivationService.pauseVoiceActivation();
         }
         
@@ -107,7 +107,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             console.log('🎤 Starting listening after TTS error...');
             if (useFallbackMode) {
               startFallbackListeningRef.current();
-            } else {
+      } else {
               voiceActivationService.startListening();
             }
           }, 500); // Faster recovery
@@ -123,9 +123,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             console.log('🎤 Starting listening after TTS failure...');
             if (useFallbackMode) {
               startFallbackListeningRef.current();
-            } else {
+          } else {
               voiceActivationService.startListening();
-            }
+          }
           }, 500); // Faster recovery
         }
       } else {
@@ -320,7 +320,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         
         setAudioLevel(smoothedLevel);
         requestAnimationFrame(monitor);
-      } catch (error) {
+    } catch (error) {
         console.error('Error in fallback audio monitoring:', error);
         requestAnimationFrame(monitor);
       }
@@ -432,7 +432,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       if (useFallbackMode || capabilities.hasLowMemory) {
         console.log('🔄 Initializing fallback voice activation mode');
         await initializeFallbackMode();
-      } else {
+        } else {
         console.log('🚀 Initializing full WASM voice activation mode');
         await initializeWASMMode();
       }
@@ -467,7 +467,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       if (useFallbackMode) {
         await startFallbackListeningRef.current();
       } else {
-        const success = await voiceActivationService.startListening();
+      const success = await voiceActivationService.startListening();
         if (!success) {
           throw new Error('Failed to start voice activation service');
         }
@@ -486,7 +486,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         window.fallbackRecognition = null;
       }
     } else {
-      voiceActivationService.stopListening();
+    voiceActivationService.stopListening();
     }
     setIsListening(false);
   }, [useFallbackMode]);
@@ -531,7 +531,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             setTimeout(() => {
               triggerGreetingSpeech();
             }, 500);
-          } else {
+      } else {
             console.log('🎤 Microphone permission not granted, waiting for user interaction...');
             // On mobile, start listening first but don't play greeting yet
             if (useFallbackMode) {
@@ -540,8 +540,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
                 startFallbackListeningRef.current();
               }, 500);
             }
-          }
-        } catch (error) {
+      }
+    } catch (error) {
           console.error('🎤 Error checking microphone permission:', error);
           // If there's an error, assume we need permission
           if (useFallbackMode) {

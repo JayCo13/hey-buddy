@@ -4,70 +4,14 @@ import screen1Animation from '../screen1.json';
 import screen2Animation from '../screen2.json';
 import screen3Animation from '../screen3.json';
 import screen4Animation from '../screen4.json';
-import { CloudCheck, Smartphone, Sun, Calendar, ArrowRight, CheckCircle, Shield, Zap, Users, BarChart3, Brain, Cpu, Network, Sparkles, Mic, AlertCircle } from 'lucide-react';
+import { CloudCheck, Smartphone, Sun, Calendar, ArrowRight, CheckCircle, Shield, Zap, Users, BarChart3, Brain, Cpu, Network, Sparkles } from 'lucide-react';
 import ShinyText from '../effects/ShinyText';
-import GradientText from '../effects/GradientText';
-import { useVoiceActivation } from '../contexts/VoiceActivationContext';
+import GradientText from '../effects/GradientText'
 
 const IntroPages = ({ onComplete }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [elementsVisible, setElementsVisible] = useState(false);
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
-  const [permissionError, setPermissionError] = useState(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
-  
-  const { triggerGreetingAfterPermission } = useVoiceActivation();
-
-  // Request microphone permission
-  const requestMicrophonePermission = async () => {
-    setIsRequestingPermission(true);
-    setPermissionError(null);
-
-    try {
-      // Check if mediaDevices is available
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Microphone API not available in this context');
-      }
-
-      // Request microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000
-        }
-      });
-
-      // Test the stream
-      if (stream && stream.getAudioTracks().length > 0) {
-        // Stop the test stream
-        stream.getTracks().forEach(track => track.stop());
-        
-        // Store permission status
-        localStorage.setItem('microphonePermissionGranted', 'true');
-        localStorage.setItem('microphonePermissionTime', Date.now().toString());
-        
-        setPermissionGranted(true);
-        
-        // Trigger greeting after permission is granted
-        triggerGreetingAfterPermission();
-        
-        // Move to next page after a short delay
-        setTimeout(() => {
-          nextPage();
-        }, 1000);
-      } else {
-        throw new Error('No audio tracks available');
-      }
-    } catch (error) {
-      console.error('Microphone permission error:', error);
-      setPermissionError(error.message);
-    } finally {
-      setIsRequestingPermission(false);
-    }
-  };
 
   // Add CSS keyframes for attractive effects
   React.useEffect(() => {
@@ -252,15 +196,6 @@ const IntroPages = ({ onComplete }) => {
       icon: "calendar-simple",
       animation: screen4Animation,
       isProblemPage: true
-    },
-    {
-      id: "microphone-permission",
-      title: "Enable Voice Features",
-      subtitle: "Grant microphone access for voice commands",
-      description: "Allow microphone access to use voice features and interact naturally with your AI assistant.",
-      icon: "microphone",
-      animation: screen1Animation,
-      isPermissionPage: true
     }
   ];
 
@@ -290,8 +225,6 @@ const IntroPages = ({ onComplete }) => {
         return <Sun size={20} className="text-current" />;
       case 'calendar-simple':
         return <Calendar size={20} className="text-current" />;
-      case 'microphone':
-        return <Mic size={20} className="text-current" />;
       default:
         return <div className="w-5 h-5 bg-blue-500 rounded-lg"></div>;
     }
@@ -492,7 +425,7 @@ const IntroPages = ({ onComplete }) => {
         }}>
         {/* Navigation Buttons */}
         <div className={`flex items-center ${currentPage === pages.length - 1 ? 'justify-center' : 'justify-between'}`}>
-          {currentPage !== pages.length - 1 && !pages[currentPage].isPermissionPage && (
+          {currentPage !== pages.length - 1 && (
             <button
               onClick={skipIntro}
               className={`px-4 py-2 rounded-lg font-medium transition-all duration-500 text-sm slide-in-left pulse ${elementsVisible ? 'opacity-100' : 'opacity-0'
@@ -510,72 +443,22 @@ const IntroPages = ({ onComplete }) => {
             </button>
           )}
 
-          {/* Microphone Permission Page */}
-          {pages[currentPage].isPermissionPage ? (
-            <div className="w-full space-y-4">
-              {permissionError && (
-                <div className="p-3 bg-red-50 rounded-lg">
-                  <div className="flex items-center">
-                    <AlertCircle className="w-4 h-4 text-red-500 mr-2" />
-                    <span className="text-sm text-red-700">{permissionError}</span>
-                  </div>
-                </div>
-              )}
-              
-              {permissionGranted ? (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-4 h-4 text-green-500 mr-2" />
-                    <span className="text-sm text-green-700">Microphone permission granted!</span>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={requestMicrophonePermission}
-                  disabled={isRequestingPermission}
-                  className={`w-full px-6 py-3 rounded-lg font-semibold transition-all duration-500 shadow-md hover:shadow-lg flex items-center justify-center space-x-2 slide-in-right pulse ${elementsVisible ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  style={{
-                    fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                    transitionDelay: '1.5s',
-                    backgroundColor: '#4079ff',
-                    border: '1px solid #4079ff',
-                    color: '#ffffff',
-                    fontWeight: '600'
-                  }}
-                >
-                  {isRequestingPermission ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Requesting Permission...
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-4 h-4 mr-2" />
-                      Allow Microphone Access
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={nextPage}
-              className={`${currentPage === pages.length - 1 ? 'w-full px-6 py-3' : 'px-6 py-2'} rounded-lg font-semibold transition-all duration-500 shadow-md hover:shadow-lg flex items-center justify-center space-x-2 slide-in-right pulse ${elementsVisible ? 'opacity-100' : 'opacity-0'
-                }`}
-              style={{
-                fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                transitionDelay: currentPage === pages.length - 1 ? '1.5s' : '1.6s',
-                backgroundColor: '#4079ff',
-                border: '1px solid #4079ff',
-                color: '#ffffff',
-                fontWeight: '600'
-              }}
-            >
-              {currentPage === pages.length - 1 ? 'Get Started' : 'Next'}
-              <ArrowRight className="w-3 h-3 text-current" />
-            </button>
-          )}
+          <button
+            onClick={nextPage}
+            className={`${currentPage === pages.length - 1 ? 'w-full px-6 py-3' : 'px-6 py-2'} rounded-lg font-semibold transition-all duration-500 shadow-md hover:shadow-lg flex items-center justify-center space-x-2 slide-in-right pulse ${elementsVisible ? 'opacity-100' : 'opacity-0'
+              }`}
+            style={{
+              fontFamily: 'Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              transitionDelay: currentPage === pages.length - 1 ? '1.5s' : '1.6s',
+              backgroundColor: '#4079ff',
+              border: '1px solid #4079ff',
+              color: '#ffffff',
+              fontWeight: '600'
+            }}
+          >
+            {currentPage === pages.length - 1 ? 'Get Started' : 'Next'}
+            <ArrowRight className="w-3 h-3 text-current" />
+          </button>
         </div>
       </div>
     </div>
