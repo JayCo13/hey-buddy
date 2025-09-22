@@ -49,10 +49,17 @@ const MainScreen = ({ onNavigate }) => {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Only trigger greeting on mobile if it hasn't been played yet
+      // Only trigger greeting on mobile if it hasn't been played yet AND microphone permission is granted
       if (useFallbackMode && !greetingInitialized) {
-        console.log('🎤 Mobile: Triggering greeting after user interaction');
-        await triggerGreetingSpeech();
+        // Check if microphone permission is granted before triggering greeting
+        const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
+        
+        if (permissionGranted) {
+          console.log('🎤 Mobile: Microphone permission granted, triggering greeting after user interaction');
+          await triggerGreetingSpeech();
+        } else {
+          console.log('🎤 Mobile: Microphone permission not granted, skipping greeting');
+        }
       }
     }
   }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
