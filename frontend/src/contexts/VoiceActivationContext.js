@@ -58,6 +58,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Trigger greeting speech
   const triggerGreetingSpeech = useCallback(async () => {
     try {
+      // Safety check: Don't trigger greeting if permission not granted
+      const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
+      if (!permissionGranted) {
+        console.log('🎤 Safety check: Skipping greeting - microphone permission not granted');
+        return;
+      }
+      
       console.log('🎤 Triggering greeting speech...');
       const greetingObj = await greetingService.generateGreeting();
       console.log('🎤 Greeting received:', greetingObj);
@@ -153,6 +160,30 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         triggerGreetingSpeech();
       }, 500);
     }
+  }, [greetingInitialized, triggerGreetingSpeech]);
+
+  // Listen for permission changes
+  useEffect(() => {
+    const handlePermissionChange = () => {
+      const permissionGranted = localStorage.getItem('microphonePermissionGranted') === 'true';
+      if (permissionGranted && !greetingInitialized) {
+        console.log('🎤 Permission change detected, triggering greeting...');
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 500);
+      }
+    };
+
+    // Listen for storage changes (when permission is granted in another tab)
+    window.addEventListener('storage', handlePermissionChange);
+    
+    // Also listen for focus events to check permission status
+    window.addEventListener('focus', handlePermissionChange);
+
+    return () => {
+      window.removeEventListener('storage', handlePermissionChange);
+      window.removeEventListener('focus', handlePermissionChange);
+    };
   }, [greetingInitialized, triggerGreetingSpeech]);
 
   // Start fallback listening using Web Speech API
@@ -531,22 +562,33 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
             setTimeout(() => {
               triggerGreetingSpeech();
             }, 500);
-      } else {
+          } else {
             console.log('🎤 Microphone permission not granted, waiting for user interaction...');
-            // On mobile, start listening first but don't play greeting yet
+            // Don't play greeting yet - wait for permission on both mobile and desktop
             if (useFallbackMode) {
               console.log('🎤 Mobile mode: Starting listening first, greeting will play after permission granted');
               setTimeout(() => {
                 startFallbackListeningRef.current();
               }, 500);
+      } else {
+              console.log('🎤 Desktop mode: Waiting for microphone permission before greeting');
+              // On desktop, we can still start listening but won't greet until permission is granted
+              setTimeout(() => {
+                startListening();
+              }, 500);
             }
       }
     } catch (error) {
           console.error('🎤 Error checking microphone permission:', error);
-          // If there's an error, assume we need permission
+          // If there's an error, assume we need permission - don't play greeting
           if (useFallbackMode) {
             setTimeout(() => {
               startFallbackListeningRef.current();
+            }, 500);
+          } else {
+            console.log('🎤 Desktop mode: Error checking permission, waiting for user interaction');
+            setTimeout(() => {
+              startListening();
             }, 500);
           }
         }
