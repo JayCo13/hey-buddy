@@ -3,12 +3,13 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1a1a1a" />
     <meta
       name="description"
       content="Hey Buddy - AI-powered voice assistant for managing tasks, notes, and schedules"
     />
+    <!-- PWA Meta Tags for Standalone Mode -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Hey Buddy" />
@@ -17,6 +18,9 @@
     <meta name="msapplication-tap-highlight" content="no" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="apple-touch-fullscreen" content="yes" />
+    <!-- Prevent browser UI -->
+    <meta name="full-screen" content="yes" />
+    <meta name="browsermode" content="application" />
     <!-- Cross-Origin Isolation Headers for WebAssembly -->
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">

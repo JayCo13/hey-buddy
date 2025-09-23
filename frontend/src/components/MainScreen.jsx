@@ -4,12 +4,14 @@ import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
+import { isStandalonePWA, logPWAStatus } from '../utils/pwaUtils';
 
 const MainScreen = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [playingAudio, setPlayingAudio] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
+  const [isPWAMode, setIsPWAMode] = useState(false);
   
   // Voice activation context
   const {
@@ -142,6 +144,29 @@ const MainScreen = ({ onNavigate }) => {
     };
   }, [speechEnabled, currentGreeting, greetingInitialized]);
 
+  // Check PWA status on mount
+  useEffect(() => {
+    const checkPWAStatus = () => {
+      const isStandalone = isStandalonePWA();
+      setIsPWAMode(isStandalone);
+      
+      // Log PWA status for debugging
+      logPWAStatus();
+      
+      if (isStandalone) {
+        console.log('✅ App is running in standalone PWA mode - browser UI should be hidden');
+      } else {
+        console.log('⚠️ App is running in browser mode - to hide browser UI, install as PWA');
+      }
+    };
+    
+    checkPWAStatus();
+    
+    // Check again after a short delay in case display mode changes
+    const timer = setTimeout(checkPWAStatus, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   const generateWaveform = () => {
     return Array.from({ length: 8 }, (_, i) => (
