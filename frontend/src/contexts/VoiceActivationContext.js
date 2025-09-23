@@ -21,6 +21,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   const [currentGreeting, setCurrentGreeting] = useState('');
   const [greetingInitialized, setGreetingInitialized] = useState(false);
   const [useFallbackMode, setUseFallbackMode] = useState(false);
+  const [microphonePermissionGranted, setMicrophonePermissionGranted] = useState(false);
   const [deviceCapabilities, setDeviceCapabilities] = useState({
     supportsWASM: true,
     memoryLimit: 'unknown',
@@ -328,6 +329,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     // Initialize basic microphone access for audio level monitoring
     try {
+      console.log('🎤 Requesting microphone permission...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -337,6 +339,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
           channelCount: 1
         }
       });
+
+      console.log('✅ Microphone permission granted');
+      setMicrophonePermissionGranted(true);
 
       // Create audio context for level monitoring
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -357,6 +362,8 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
       console.log('✅ Fallback voice activation initialized');
     } catch (err) {
+      console.error('❌ Microphone permission denied or failed:', err);
+      setMicrophonePermissionGranted(false);
       throw new Error(`Failed to initialize fallback mode: ${err.message}`);
     }
   }, [startFallbackAudioLevelMonitoring]);
@@ -406,6 +413,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setIsListening(false);
       }
     });
+
+    // WASM mode doesn't require explicit microphone permission dialog
+    setMicrophonePermissionGranted(true);
+    console.log('✅ WASM voice activation initialized');
   }, [onNavigateToRecord]);
 
   // Initialize voice activation with fallback support
@@ -504,26 +515,31 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     };
   }, [initializeVoiceActivation, useFallbackMode]);
 
-  // Trigger immediate greeting when initialized (only once)
+  // Trigger immediate greeting when initialized and microphone permission is granted (only once)
   useEffect(() => {
     if (isInitialized && !greetingInitialized) {
-      console.log('🎤 Voice activation initialized, triggering immediate greeting...');
+      console.log('🎤 Voice activation initialized, checking conditions for greeting...');
       
-      // On mobile, we need user interaction for TTS, so start listening first
+      // On mobile, we need user interaction for TTS AND microphone permission for listening
       if (useFallbackMode) {
-        console.log('🎤 Mobile mode: Starting listening first, greeting will play after user interaction');
-        // Start listening immediately on mobile
-        setTimeout(() => {
-          startFallbackListeningRef.current();
-        }, 500);
+        if (microphonePermissionGranted) {
+          console.log('🎤 Mobile mode: Microphone permission granted, starting greeting and listening...');
+          // Start greeting first, then listening will start after greeting completes
+          setTimeout(() => {
+            triggerGreetingSpeech();
+          }, 500);
+        } else {
+          console.log('🎤 Mobile mode: Waiting for microphone permission before greeting...');
+        }
       } else {
-        // Desktop: play greeting first
+        // Desktop: play greeting first (no microphone permission needed for TTS)
+        console.log('🎤 Desktop mode: Starting greeting immediately...');
         setTimeout(() => {
           triggerGreetingSpeech();
         }, 500); // Reduced delay for faster greeting
       }
     }
-  }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode]);
+  }, [isInitialized, greetingInitialized, triggerGreetingSpeech, useFallbackMode, microphonePermissionGranted]);
 
   // Restart listening when user returns to the page
   useEffect(() => {
@@ -555,6 +571,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     currentGreeting,
     greetingInitialized,
     useFallbackMode,
+    microphonePermissionGranted,
     deviceCapabilities,
     startListening,
     stopListening,
