@@ -86,9 +86,68 @@ export const addPWAEventListeners = (onStandaloneChange) => {
 };
 
 /**
+ * Force fullscreen mode for PWA
+ */
+export const forceFullscreenMode = () => {
+  // Add CSS class to force fullscreen
+  document.documentElement.classList.add('pwa-fullscreen');
+  document.body.classList.add('pwa-fullscreen');
+  
+  // Add inline styles as backup
+  const style = document.createElement('style');
+  style.textContent = `
+    .pwa-fullscreen {
+      height: 100vh !important;
+      height: 100dvh !important;
+      width: 100vw !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow-x: hidden !important;
+    }
+    
+    html.pwa-fullscreen, body.pwa-fullscreen {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+    }
+  `;
+  document.head.appendChild(style);
+  
+  // Try to hide address bar on mobile
+  if (window.screen && window.screen.orientation) {
+    setTimeout(() => {
+      window.scrollTo(0, 1);
+    }, 100);
+  }
+};
+
+/**
+ * Check if browser UI is visible (debugging helper)
+ */
+export const checkBrowserUI = () => {
+  const windowHeight = window.innerHeight;
+  const screenHeight = window.screen ? window.screen.height : windowHeight;
+  const availableHeight = window.screen ? window.screen.availHeight : windowHeight;
+  
+  const hasVisibleUI = windowHeight < availableHeight * 0.9;
+  
+  return {
+    windowHeight,
+    screenHeight,
+    availableHeight,
+    hasVisibleUI,
+    heightRatio: windowHeight / availableHeight
+  };
+};
+
+/**
  * Log PWA status for debugging
  */
 export const logPWAStatus = () => {
+  const uiStatus = checkBrowserUI();
+  
   console.log('🔧 PWA Status:', {
     isStandalone: isStandalonePWA(),
     displayMode: getPWADisplayMode(),
@@ -96,6 +155,14 @@ export const logPWAStatus = () => {
     hasSafeAreas: hasSafeAreaInsets(),
     userAgent: navigator.userAgent,
     standalone: window.navigator.standalone,
-    serviceWorkerSupported: 'serviceWorker' in navigator
+    serviceWorkerSupported: 'serviceWorker' in navigator,
+    browserUI: uiStatus
   });
+  
+  if (uiStatus.hasVisibleUI) {
+    console.warn('⚠️ Browser UI appears to be visible. Height ratio:', uiStatus.heightRatio);
+    console.warn('💡 Try: 1) Reinstall PWA, 2) Open from home screen, 3) Check manifest.json');
+  } else {
+    console.log('✅ App appears to be running fullscreen');
+  }
 };

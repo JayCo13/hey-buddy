@@ -43,6 +43,38 @@ body {
   }
 }
 
+/* Force fullscreen for all PWA modes */
+@media (display-mode: standalone), 
+       (display-mode: fullscreen), 
+       (display-mode: minimal-ui) {
+  html, body {
+    height: 100vh !important;
+    height: 100dvh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+  }
+  
+  #root {
+    height: 100vh !important;
+    height: 100dvh !important;
+    width: 100vw !important;
+  }
+}
+
+/* iOS Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  body {
+    /* iOS Safari specific height handling */
+    height: -webkit-fill-available;
+  }
+  
+  #root {
+    height: -webkit-fill-available;
+  }
+}
+
 /* Root container for PWA */
 #root {
   height: 100vh;
