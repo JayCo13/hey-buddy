@@ -20,6 +20,44 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* PWA Full Screen Styles */
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  background-color: #000000;
+}
+
+/* Ensure root container takes full screen */
+#root {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height for mobile */
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Hide Safari browser UI elements */
+@supports (-webkit-touch-callout: none) {
+  body {
+    /* iOS Safari specific styles */
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Hide Safari address bar and footer */
+  @media screen and (max-width: 768px) {
+    body {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 100vh;
+      height: 100dvh;
+    }
+  }
 }
 
 code {
