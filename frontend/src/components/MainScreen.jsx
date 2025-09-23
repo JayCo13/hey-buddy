@@ -4,14 +4,12 @@ import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
-import { isStandalonePWA, logPWAStatus, forceFullscreenMode } from '../utils/pwaUtils';
 
 const MainScreen = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState('home');
   const [playingAudio, setPlayingAudio] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
-  const [isPWAMode, setIsPWAMode] = useState(false);
   
   // Voice activation context
   const {
@@ -144,46 +142,6 @@ const MainScreen = ({ onNavigate }) => {
     };
   }, [speechEnabled, currentGreeting, greetingInitialized]);
 
-  // Check PWA status on mount
-  useEffect(() => {
-    const checkPWAStatus = () => {
-      const isStandalone = isStandalonePWA();
-      setIsPWAMode(isStandalone);
-      
-      // Log PWA status for debugging
-      logPWAStatus();
-      
-      if (isStandalone) {
-        console.log('✅ App is running in standalone PWA mode - browser UI should be hidden');
-        // Force fullscreen mode as backup
-        forceFullscreenMode();
-      } else {
-        console.log('⚠️ App is running in browser mode - to hide browser UI, install as PWA');
-        console.log('📱 Instructions: Add to Home Screen, then open from home screen (not browser)');
-      }
-    };
-    
-    checkPWAStatus();
-    
-    // Check again after a short delay in case display mode changes
-    const timer = setTimeout(checkPWAStatus, 1000);
-    
-    // Also check on window resize (orientation change, etc.)
-    const handleResize = () => {
-      if (isPWAMode) {
-        forceFullscreenMode();
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-    
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, [isPWAMode]);
 
   const generateWaveform = () => {
     return Array.from({ length: 8 }, (_, i) => (
