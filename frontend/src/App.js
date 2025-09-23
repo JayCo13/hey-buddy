@@ -34,64 +34,13 @@ function App() {
     initSW();
     initOfflineSync();
 
-    // Hide Safari browser UI for PWA
-    const hideSafariUI = () => {
-      // Check if running as PWA
-      if (window.matchMedia('(display-mode: standalone)').matches || 
-          window.navigator.standalone === true) {
-        
-        // Force full screen on iOS Safari
-        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-          // Scroll to top to hide address bar
-          window.scrollTo(0, 1);
-          
-          // Prevent bounce scrolling
-          document.body.style.overflow = 'hidden';
-          document.documentElement.style.overflow = 'hidden';
-          
-          // Set viewport height to actual screen height
-          const setViewportHeight = () => {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-          };
-          
-          setViewportHeight();
-          window.addEventListener('resize', setViewportHeight);
-          window.addEventListener('orientationchange', setViewportHeight);
-        }
-      }
-    };
-
-    // Run immediately and after delays
-    hideSafariUI();
-    setTimeout(hideSafariUI, 100);
-    setTimeout(hideSafariUI, 500);
-    setTimeout(hideSafariUI, 1000);
-
-    // Handle orientation changes
-    window.addEventListener('orientationchange', () => {
-      setTimeout(hideSafariUI, 100);
-    });
-
-    // Handle visibility changes (when returning from background)
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        setTimeout(hideSafariUI, 100);
-      }
-    });
-
     // Show splash screen for 5 seconds, then intro
     const splashTimer = setTimeout(() => {
       setShowSplash(false);
       setShowIntro(true);
     }, 7000);
 
-    return () => {
-      clearTimeout(splashTimer);
-      // Clean up event listeners
-      window.removeEventListener('orientationchange', hideSafariUI);
-      document.removeEventListener('visibilitychange', hideSafariUI);
-    };
+    return () => clearTimeout(splashTimer);
   }, []);
 
   // Show splash screen
