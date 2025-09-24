@@ -38,7 +38,7 @@ const ProfileScreen = ({ onBack, onNavigate }) => {
   };
 
   return (
-    <div className="intro-responsive bg-black text-white relative overflow-hidden pwa-container">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
 
       {/* Galaxy Animation Background */}
       <div className="absolute inset-0 overflow-hidden">
