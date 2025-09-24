@@ -54,8 +54,8 @@ const MainScreen = ({ onNavigate }) => {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Only trigger greeting on mobile if it hasn't been played yet and voice activation is ready
-      if (useFallbackMode && !greetingInitialized && voiceActivationReady && voiceActivationState === 'ready') {
+      // Only trigger greeting on mobile if it hasn't been played yet
+      if (useFallbackMode && !greetingInitialized) {
         console.log('🎤 Mobile: Triggering greeting after user interaction');
         await triggerGreetingSpeech();
       }
@@ -116,7 +116,7 @@ const MainScreen = ({ onNavigate }) => {
     let hasTriggered = false;
     
     const handleUserInteraction = () => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
         hasTriggered = true;
         console.log('User interaction detected, enabling speech automatically...');
         enableSpeech();
@@ -132,7 +132,7 @@ const MainScreen = ({ onNavigate }) => {
 
     // Fallback timer with longer delay to reduce aggressive triggering
     const autoEnableTimer = setTimeout(() => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
         hasTriggered = true;
         console.log('Attempting auto-enable speech...');
         enableSpeech();
@@ -145,7 +145,7 @@ const MainScreen = ({ onNavigate }) => {
       });
       clearTimeout(autoEnableTimer);
     };
-  }, [speechEnabled, currentGreeting, greetingInitialized, voiceActivationReady]);
+  }, [speechEnabled, currentGreeting, greetingInitialized]);
 
 
   const generateWaveform = () => {

@@ -65,9 +65,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Trigger greeting speech with proper state management
   const triggerGreetingSpeech = useCallback(async () => {
     try {
-      // Check if we're in a valid state to start greeting
-      if (voiceActivationState !== 'ready' || speechInProgress) {
-        console.log('🎤 Cannot start greeting - invalid state:', voiceActivationState, 'speechInProgress:', speechInProgress);
+      // Check if we're in a valid state to start greeting (less restrictive)
+      if (speechInProgress) {
+        console.log('🎤 Cannot start greeting - speech already in progress');
         return;
       }
 
@@ -417,6 +417,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
       console.log('✅ Microphone permission granted');
       setMicrophonePermissionGranted(true);
+      
+      // Store permission in localStorage for persistence
+      localStorage.setItem('microphonePermissionGranted', 'true');
+      localStorage.setItem('microphonePermissionTime', Date.now().toString());
 
       // Create audio context for level monitoring
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -491,6 +495,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     // WASM mode doesn't require explicit microphone permission dialog
     setMicrophonePermissionGranted(true);
+    
+    // Store permission in localStorage for persistence
+    localStorage.setItem('microphonePermissionGranted', 'true');
+    localStorage.setItem('microphonePermissionTime', Date.now().toString());
+    
     console.log('✅ WASM voice activation initialized');
   }, [onNavigateToRecord]);
 
@@ -514,9 +523,14 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       }
 
       setIsInitialized(true);
-      setVoiceActivationReady(true);
-      setVoiceActivationState('ready');
       console.log('✅ Voice activation initialized successfully');
+      
+      // Set ready state after a brief delay to ensure everything is properly initialized
+      setTimeout(() => {
+        setVoiceActivationReady(true);
+        setVoiceActivationState('ready');
+        console.log('🎤 Voice activation is now ready');
+      }, 1000);
       
     } catch (err) {
       console.error('❌ Voice activation initialization failed:', err);
@@ -542,9 +556,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
   // Start listening with fallback support and proper state management
   const startListening = useCallback(async () => {
     try {
-      // Check if we're in a valid state to start listening
-      if (voiceActivationState !== 'ready' || speechInProgress) {
-        console.log('🎤 Cannot start listening - invalid state:', voiceActivationState, 'speechInProgress:', speechInProgress);
+      // Check if we're in a valid state to start listening (less restrictive)
+      if (speechInProgress) {
+        console.log('🎤 Cannot start listening - speech in progress');
         return;
       }
 
@@ -610,7 +624,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
   // Trigger immediate greeting when voice activation is ready (only once)
   useEffect(() => {
-    if (voiceActivationReady && !greetingInitialized && voiceActivationState === 'ready') {
+    if (voiceActivationReady && !greetingInitialized) {
       console.log('🎤 Voice activation ready, checking conditions for greeting...');
       
       // On mobile, we need user interaction for TTS AND microphone permission for listening
@@ -632,7 +646,19 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         }, 500); // Reduced delay for faster greeting
       }
     }
-  }, [voiceActivationReady, greetingInitialized, voiceActivationState, triggerGreetingSpeech, useFallbackMode, microphonePermissionGranted]);
+  }, [voiceActivationReady, greetingInitialized, triggerGreetingSpeech, useFallbackMode, microphonePermissionGranted]);
+
+  // Fallback greeting trigger - if greeting hasn't been triggered after 3 seconds, try anyway
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (isInitialized && !greetingInitialized && !speechInProgress) {
+        console.log('🎤 Fallback: Triggering greeting after timeout...');
+        triggerGreetingSpeech();
+      }
+    }, 3000);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [isInitialized, greetingInitialized, speechInProgress, triggerGreetingSpeech]);
 
   // Restart listening when user returns to the page
   useEffect(() => {
