@@ -20,7 +20,12 @@ const MainScreen = ({ onNavigate }) => {
     currentGreeting,
     greetingInitialized,
     triggerGreetingSpeech,
-    useFallbackMode
+    useFallbackMode,
+    // New state variables
+    isSpeaking,
+    voiceActivationReady,
+    speechInProgress,
+    voiceActivationState
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -49,13 +54,13 @@ const MainScreen = ({ onNavigate }) => {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Only trigger greeting on mobile if it hasn't been played yet
-      if (useFallbackMode && !greetingInitialized) {
+      // Only trigger greeting on mobile if it hasn't been played yet and voice activation is ready
+      if (useFallbackMode && !greetingInitialized && voiceActivationReady && voiceActivationState === 'ready') {
         console.log('🎤 Mobile: Triggering greeting after user interaction');
         await triggerGreetingSpeech();
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -111,7 +116,7 @@ const MainScreen = ({ onNavigate }) => {
     let hasTriggered = false;
     
     const handleUserInteraction = () => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
         hasTriggered = true;
         console.log('User interaction detected, enabling speech automatically...');
         enableSpeech();
@@ -127,7 +132,7 @@ const MainScreen = ({ onNavigate }) => {
 
     // Fallback timer with longer delay to reduce aggressive triggering
     const autoEnableTimer = setTimeout(() => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
         hasTriggered = true;
         console.log('Attempting auto-enable speech...');
         enableSpeech();
@@ -140,7 +145,7 @@ const MainScreen = ({ onNavigate }) => {
       });
       clearTimeout(autoEnableTimer);
     };
-  }, [speechEnabled, currentGreeting, greetingInitialized]);
+  }, [speechEnabled, currentGreeting, greetingInitialized, voiceActivationReady]);
 
 
   const generateWaveform = () => {
@@ -202,17 +207,38 @@ const MainScreen = ({ onNavigate }) => {
               
               {/* Modern Speech Status Indicator */}
               <div className="flex justify-center">
-                {!isInitialized && (
+                {voiceActivationState === 'initializing' && (
                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
                     <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
                   </div>
                 )}
                 
-                {isInitialized && (
+                {voiceActivationState === 'speaking' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse mr-3"></div>
+                    <span className="text-sm font-medium text-blue-300">AI speaking</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'listening' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse mr-3"></div>
+                    <span className="text-sm font-medium text-green-300">AI listening</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'ready' && (
                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full mr-3"></div>
-                    <span className="text-sm font-medium text-emerald-300">AI voice active</span>
+                    <span className="text-sm font-medium text-emerald-300">AI voice ready</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'error' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mr-3"></div>
+                    <span className="text-sm font-medium text-red-300">AI voice error</span>
                   </div>
                 )}
               </div>
@@ -334,8 +360,12 @@ const MainScreen = ({ onNavigate }) => {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                     <p className="text-blue-400 text-xs">
-                      {speechEnabled 
+                      {voiceActivationState === 'speaking' 
+                        ? 'Mobile-optimized voice mode • AI speaking'
+                        : voiceActivationState === 'listening'
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
+                        : speechEnabled 
+                        ? 'Mobile-optimized voice mode • Ready'
                         : 'Tap anywhere to enable voice features'
                       }
                     </p>
@@ -343,14 +373,22 @@ const MainScreen = ({ onNavigate }) => {
                 </div>
               )}
               
-              {/* Simple status indicator */}
+              {/* Enhanced status indicator */}
               <div className="text-center">
-                {!isInitialized ? (
-                  <div className="text-gray-400 text-sm">Initializing voice activation...</div>
-                ) : isListening ? (
-                  <div className="text-blue-400 text-sm">🎤 Listening...</div>
-                ) : (
-                  <div className="text-gray-400 text-sm">Ready to listen</div>
+                {voiceActivationState === 'initializing' && (
+                  <div className="text-amber-400 text-sm">🔄 Initializing voice activation...</div>
+                )}
+                {voiceActivationState === 'speaking' && (
+                  <div className="text-blue-400 text-sm">🔊 AI speaking...</div>
+                )}
+                {voiceActivationState === 'listening' && (
+                  <div className="text-green-400 text-sm">🎤 Listening for wake word...</div>
+                )}
+                {voiceActivationState === 'ready' && (
+                  <div className="text-emerald-400 text-sm">✅ Ready to listen</div>
+                )}
+                {voiceActivationState === 'error' && (
+                  <div className="text-red-400 text-sm">❌ Voice activation error</div>
                 )}
               </div>
               
