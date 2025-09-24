@@ -266,7 +266,7 @@ const IntroPages = ({ onComplete }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden relative" style={{ backgroundColor: '#1A1A1A' }}>
+    <div className="intro-responsive flex flex-col overflow-hidden relative pwa-container" style={{ backgroundColor: '#1A1A1A' }}>
       {/* Dark AI Technology Background */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Neural Network Pattern */}
@@ -298,9 +298,9 @@ const IntroPages = ({ onComplete }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col px-4 py-4 relative z-10 overflow-y-auto">
+      <div className="flex-1 flex flex-col px-4 py-4 relative z-10 overflow-y-auto safe-area">
         {/* Problem Screen Layout - Similar to provided image */}
-        <div className={`w-full max-w-md mx-auto flex flex-col items-center justify-center h-full transition-all duration-300 ease-in-out ${isTransitioning
+        <div className={`w-full max-w-md mx-auto flex flex-col items-center justify-center min-h-full transition-all duration-300 ease-in-out ${isTransitioning
           ? 'transform translate-x-full opacity-0 scale-95'
           : 'transform translate-x-0 opacity-100 scale-100'
           }`}>
@@ -347,12 +347,12 @@ const IntroPages = ({ onComplete }) => {
           </div>
 
           {/* Central Illustration Section */}
-          <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0">
             {/* AI Character Container */}
             <div className={`relative mb-3 scale-in ${elementsVisible ? 'opacity-100' : 'opacity-0'
               }`} style={{ transitionDelay: '0.2s' }}>
               {/* AI Character - Enhanced Lottie Display */}
-              <div className="relative w-80 h-80 flex items-center justify-center">
+              <div className="relative lottie-responsive flex items-center justify-center">
                 {/* Glowing background effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-cyan-500/10 rounded-3xl blur-xl pulse"></div>
 
@@ -417,7 +417,7 @@ const IntroPages = ({ onComplete }) => {
       </div>
 
       {/* Enhanced Navigation */}
-      <div className={`px-4 py-4 relative z-10 fade-in-up ${elementsVisible ? 'opacity-100' : 'opacity-0'
+      <div className={`px-4 py-4 relative z-10 fade-in-up safe-bottom ${elementsVisible ? 'opacity-100' : 'opacity-0'
         }`} style={{
           transitionDelay: '1.4s',
           backgroundColor: '#1A1A1A',

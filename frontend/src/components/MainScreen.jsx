@@ -161,7 +161,7 @@ const MainScreen = ({ onNavigate }) => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="intro-responsive bg-black text-white pwa-container">
 
       {/* App Header */}
       <div className="flex items-center justify-between px-6 py-4">

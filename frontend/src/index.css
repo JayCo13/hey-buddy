@@ -95,6 +95,36 @@
     z-index: 10000;
     background-color: #000000;
   }
+  
+  /* Responsive intro screen styles */
+  .intro-responsive {
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+  
+  /* Responsive Lottie container */
+  .lottie-responsive {
+    width: clamp(200px, 20vw, 320px);
+    height: clamp(200px, 20vw, 320px);
+  }
+  
+  /* Mobile-first responsive adjustments */
+  @media (max-height: 600px) {
+    .lottie-responsive {
+      width: clamp(150px, 15vw, 250px);
+      height: clamp(150px, 15vw, 250px);
+    }
+  }
+  
+  @media (max-height: 500px) {
+    .lottie-responsive {
+      width: clamp(120px, 12vw, 200px);
+      height: clamp(120px, 12vw, 200px);
+    }
+  }
 }
 
 body {

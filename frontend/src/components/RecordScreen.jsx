@@ -195,7 +195,7 @@ const RecordScreen = ({ onNavigate }) => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white relative overflow-hidden">
+    <div className="intro-responsive bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white relative overflow-hidden pwa-container">
       {/* Threads Background */}
       <div className="absolute inset-0">
         {useMemo(() => (
