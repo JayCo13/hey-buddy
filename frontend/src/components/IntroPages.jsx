@@ -298,7 +298,7 @@ const IntroPages = ({ onComplete }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col px-4 py-4 relative z-10 overflow-y-auto">
+      <div className="flex-1 flex flex-col px-4 py-4 relative z-10 overflow-y-auto main-content-safe">
         {/* Problem Screen Layout - Similar to provided image */}
         <div className={`w-full max-w-md mx-auto flex flex-col items-center justify-center h-full transition-all duration-300 ease-in-out ${isTransitioning
           ? 'transform translate-x-full opacity-0 scale-95'
@@ -417,7 +417,7 @@ const IntroPages = ({ onComplete }) => {
       </div>
 
       {/* Enhanced Navigation */}
-      <div className={`px-4 py-4 relative z-10 fade-in-up ${elementsVisible ? 'opacity-100' : 'opacity-0'
+      <div className={`px-4 py-4 relative z-10 fade-in-up nav-safe ${elementsVisible ? 'opacity-100' : 'opacity-0'
         }`} style={{
           transitionDelay: '1.4s',
           backgroundColor: '#1A1A1A',

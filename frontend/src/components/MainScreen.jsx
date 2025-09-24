@@ -164,7 +164,7 @@ const MainScreen = ({ onNavigate }) => {
     <div className="min-h-screen bg-black text-white">
 
       {/* App Header */}
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-4 main-content-safe">
         <div className="w-11 h-11 rounded-lg flex items-center justify-center">
           <div className="w-9 h-9">
             <Lottie
@@ -437,7 +437,7 @@ const MainScreen = ({ onNavigate }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-gray-800/80 backdrop-blur-xl border-t border-gray-600/30 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-gray-800/80 backdrop-blur-xl border-t border-gray-600/30 shadow-2xl nav-safe">
         <div className="flex items-center justify-around py-3">
           {[
             { id: 'home', label: 'Home', icon: Home },
