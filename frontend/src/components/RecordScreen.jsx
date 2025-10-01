@@ -224,7 +224,7 @@ const RecordScreen = ({ onNavigate }) => {
       </div>
       
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between px-6 py-4 pt-12">
+      <div className="relative z-10 flex items-center justify-between px-6 py-4 pt-12 main-content-safe">
         <button 
           onClick={() => onNavigate('home')}
           className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors"

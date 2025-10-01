@@ -42,7 +42,131 @@
     min-height: 100dvh; /* Dynamic viewport height for mobile */
     width: 100vw;
     overflow-x: hidden;
+    position: relative;
   }
+  
+  /* Safari PWA specific styles */
+  .pwa-container {
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100vw;
+    position: relative;
+    background-color: #000000;
+    color: #ffffff;
+  }
+  
+  /* Status bar overlay for iOS */
+  .status-bar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    background-color: #000000;
+    z-index: 9999;
+  }
+  
+  /* Hide Safari UI elements */
+  .hide-safari-ui {
+    -webkit-appearance: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Prevent zoom on iOS */
+  .prevent-zoom {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+  }
+  
+  /* Fullscreen mode styles */
+  .fullscreen-mode {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 10000;
+    background-color: #000000;
+  }
+  
+  /* Ensure safe area padding works correctly */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* PWA container with safe area support */
+  .pwa-container {
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    position: relative;
+  }
+  
+  /* Ensure content doesn't overlap with status bar */
+  .content-safe {
+    padding-top: max(env(safe-area-inset-top), 20px);
+    padding-bottom: max(env(safe-area-inset-bottom), 20px);
+  }
+  
+  /* Safe area for main content only */
+  .main-content-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* Safe area for navigation only */
+  .nav-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Responsive intro screen styles */
+  .intro-responsive {
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+  
+  /* Responsive Lottie container */
+  .lottie-responsive {
+    width: clamp(200px, 20vw, 320px);
+    height: clamp(200px, 20vw, 320px);
+  }
+  
+  /* Mobile-first responsive adjustments */
+  @media (max-height: 600px) {
+    .lottie-responsive {
+      width: clamp(150px, 15vw, 250px);
+      height: clamp(150px, 15vw, 250px);
+    }
+  }
+  
+  @media (max-height: 500px) {
+    .lottie-responsive {
+      width: clamp(120px, 12vw, 200px);
+      height: clamp(120px, 12vw, 200px);
+    }
+  }
+  
 }
 
 body {
@@ -53,14 +177,37 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   
-  /* PWA Safe Area Support for iOS */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  /* Safari PWA specific styles */
+  background-color: #000000;
+  color: #ffffff;
+  overflow-x: hidden;
+  
+  /* Prevent Safari bounce effect */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  
+  /* Hide Safari UI elements */
+  -webkit-appearance: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  
+  /* Prevent zoom on double tap */
+  touch-action: manipulation;
+  
+  /* Fullscreen support */
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Ensure root element handles safe area properly */
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
 }

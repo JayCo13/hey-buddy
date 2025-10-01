@@ -20,7 +20,12 @@ const MainScreen = ({ onNavigate }) => {
     currentGreeting,
     greetingInitialized,
     triggerGreetingSpeech,
-    useFallbackMode
+    useFallbackMode,
+    // New state variables
+    isSpeaking,
+    voiceActivationReady,
+    speechInProgress,
+    voiceActivationState
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -55,7 +60,7 @@ const MainScreen = ({ onNavigate }) => {
         await triggerGreetingSpeech();
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -164,7 +169,7 @@ const MainScreen = ({ onNavigate }) => {
     <div className="min-h-screen bg-black text-white">
 
       {/* App Header */}
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-4 main-content-safe">
         <div className="w-11 h-11 rounded-lg flex items-center justify-center">
           <div className="w-9 h-9">
             <Lottie
@@ -202,17 +207,38 @@ const MainScreen = ({ onNavigate }) => {
               
               {/* Modern Speech Status Indicator */}
               <div className="flex justify-center">
-                {!isInitialized && (
+                {voiceActivationState === 'initializing' && (
                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
                     <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
                   </div>
                 )}
                 
-                {isInitialized && (
+                {voiceActivationState === 'speaking' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse mr-3"></div>
+                    <span className="text-sm font-medium text-blue-300">AI speaking</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'listening' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-pulse mr-3"></div>
+                    <span className="text-sm font-medium text-green-300">AI listening</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'ready' && (
                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-emerald-500/20 to-green-500/20 border border-emerald-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full mr-3"></div>
-                    <span className="text-sm font-medium text-emerald-300">AI voice active</span>
+                    <span className="text-sm font-medium text-emerald-300">AI voice ready</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'error' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-red-400 to-pink-400 rounded-full mr-3"></div>
+                    <span className="text-sm font-medium text-red-300">AI voice error</span>
                   </div>
                 )}
               </div>
@@ -334,8 +360,12 @@ const MainScreen = ({ onNavigate }) => {
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                     <p className="text-blue-400 text-xs">
-                      {speechEnabled 
+                      {voiceActivationState === 'speaking' 
+                        ? 'Mobile-optimized voice mode • AI speaking'
+                        : voiceActivationState === 'listening'
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
+                        : speechEnabled 
+                        ? 'Mobile-optimized voice mode • Ready'
                         : 'Tap anywhere to enable voice features'
                       }
                     </p>
@@ -343,14 +373,22 @@ const MainScreen = ({ onNavigate }) => {
                 </div>
               )}
               
-              {/* Simple status indicator */}
+              {/* Enhanced status indicator */}
               <div className="text-center">
-                {!isInitialized ? (
-                  <div className="text-gray-400 text-sm">Initializing voice activation...</div>
-                ) : isListening ? (
-                  <div className="text-blue-400 text-sm">🎤 Listening...</div>
-                ) : (
-                  <div className="text-gray-400 text-sm">Ready to listen</div>
+                {voiceActivationState === 'initializing' && (
+                  <div className="text-amber-400 text-sm">🔄 Initializing voice activation...</div>
+                )}
+                {voiceActivationState === 'speaking' && (
+                  <div className="text-blue-400 text-sm">🔊 AI speaking...</div>
+                )}
+                {voiceActivationState === 'listening' && (
+                  <div className="text-green-400 text-sm">🎤 Listening for wake word...</div>
+                )}
+                {voiceActivationState === 'ready' && (
+                  <div className="text-emerald-400 text-sm">✅ Ready to listen</div>
+                )}
+                {voiceActivationState === 'error' && (
+                  <div className="text-red-400 text-sm">❌ Voice activation error</div>
                 )}
               </div>
               
@@ -437,7 +475,7 @@ const MainScreen = ({ onNavigate }) => {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-gray-800/80 backdrop-blur-xl border-t border-gray-600/30 shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-gray-900/95 via-gray-800/90 to-gray-800/80 backdrop-blur-xl border-t border-gray-600/30 shadow-2xl nav-safe">
         <div className="flex items-center justify-around py-3">
           {[
             { id: 'home', label: 'Home', icon: Home },

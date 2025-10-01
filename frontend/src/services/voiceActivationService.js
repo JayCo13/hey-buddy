@@ -108,6 +108,12 @@ class VoiceActivationService {
       console.log('Pausing voice activation for TTS playback');
       this.stopRealTimeWakeWordDetection();
       this.stopAudioLevelMonitoring();
+      
+      // Set processing flag to prevent new audio processing
+      this.isProcessing = false;
+      
+      // Notify status change
+      this.notifyStatusChange('paused');
     }
   }
 
@@ -117,8 +123,18 @@ class VoiceActivationService {
   resumeVoiceActivation() {
     if (this.isListening) {
       console.log('Resuming voice activation after TTS playback');
+      
+      // Clear any pending processing
+      this.isProcessing = false;
+      
+      // Restart audio level monitoring
       this.startAudioLevelMonitoring();
+      
+      // Restart real-time wake word detection
       this.startRealTimeWakeWordDetection();
+      
+      // Notify status change
+      this.notifyStatusChange('listening');
     }
   }
 
@@ -319,7 +335,7 @@ class VoiceActivationService {
    * Process audio chunk for wake word detection using Whisper
    */
   async processAudioChunk() {
-    if (!this.isListening || this.audioChunks.length === 0) return;
+    if (!this.isListening || this.audioChunks.length === 0 || this.isProcessing) return;
 
     try {
       this.isProcessing = true;
@@ -579,13 +595,21 @@ class VoiceActivationService {
   }
 
   /**
+   * Check if service is in a valid state for operations
+   */
+  isValidState() {
+    return this.audioContext && this.analyser && this.microphone && !this.isProcessing;
+  }
+
+  /**
    * Get current status
    */
   getStatus() {
     return {
       isListening: this.isListening,
       isProcessing: this.isProcessing,
-      isReady: !!this.audioContext
+      isReady: !!this.audioContext,
+      isValidState: this.isValidState()
     };
   }
 }

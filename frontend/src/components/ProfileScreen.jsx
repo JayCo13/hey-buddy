@@ -83,7 +83,7 @@ const ProfileScreen = ({ onBack, onNavigate }) => {
         <div className="absolute top-1/2 right-1/3 w-20 h-20 bg-cyan-500/5 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '4s' }}></div>
       </div>
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 relative z-10">
+      <div className="flex items-center justify-between px-6 py-4 relative z-10 main-content-safe">
         <button
           onClick={onBack}
           className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-gray-700 transition-colors"
