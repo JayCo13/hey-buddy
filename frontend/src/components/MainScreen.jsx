@@ -25,7 +25,8 @@ const MainScreen = ({ onNavigate }) => {
     isSpeaking,
     voiceActivationReady,
     speechInProgress,
-    voiceActivationState
+    voiceActivationState,
+    microphoneFullyReady
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -57,13 +58,10 @@ const MainScreen = ({ onNavigate }) => {
       // Only trigger greeting on mobile if it hasn't been played yet
       if (useFallbackMode && !greetingInitialized) {
         console.log('🎤 Mobile: Triggering greeting after user interaction');
-        // Small delay to ensure TTS is ready
-        setTimeout(() => {
-          triggerGreetingSpeech();
-        }, 100);
+        await triggerGreetingSpeech();
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -202,9 +200,9 @@ const MainScreen = ({ onNavigate }) => {
             {/* Main Greeting */}
             <div className="text-center space-y-6">
               <div className="flex items-center justify-center space-x-3">
-                {/* Dynamic AI-Generated Greeting */}
+                {/* Modern Hand Wave Icon */}
                 <h1 className="text-3xl font-light text-white/90 tracking-wide">
-                  {currentGreeting?.emoji || '👋🏻'} {currentGreeting?.text || 'Hey Jayden'}
+                👋🏻 Hey Jayden
                 </h1>
               </div>
               
@@ -213,7 +211,12 @@ const MainScreen = ({ onNavigate }) => {
                 {voiceActivationState === 'initializing' && (
                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
-                    <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
+                    <span className="text-sm font-medium text-amber-300">
+                      {useFallbackMode && !microphoneFullyReady 
+                        ? 'Preparing microphone for smooth operation...' 
+                        : 'AI preparing to speak'
+                      }
+                    </span>
                   </div>
                 )}
                 
@@ -367,10 +370,10 @@ const MainScreen = ({ onNavigate }) => {
                         ? 'Mobile-optimized voice mode • AI speaking'
                         : voiceActivationState === 'listening'
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
+                        : !microphoneFullyReady
+                        ? 'Mobile-optimized voice mode • Preparing microphone...'
                         : speechEnabled 
                         ? 'Mobile-optimized voice mode • Ready'
-                        : !greetingInitialized
-                        ? 'Tap anywhere to hear your personalized greeting'
                         : 'Tap anywhere to enable voice features'
                       }
                     </p>
