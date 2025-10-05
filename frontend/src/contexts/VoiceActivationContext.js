@@ -399,6 +399,23 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     monitor();
   }, []);
 
+  // Pre-initialize audio context
+  const preInitializeAudioContext = useCallback(async () => {
+    try {
+      // Create audio context early
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      window.fallbackAudioContext = audioContext;
+      
+      // Suspend it immediately to save resources
+      await audioContext.suspend();
+      
+      return audioContext;
+    } catch (error) {
+      console.warn('Failed to pre-initialize audio context:', error);
+      return null;
+    }
+  }, []);
+
   // Initialize fallback mode using Web Speech API
   const initializeFallbackMode = useCallback(async () => {
     // Check if Web Speech API is available
@@ -406,10 +423,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       throw new Error('Speech recognition not supported on this device');
     }
 
-    // Initialize basic microphone access for audio level monitoring
     try {
+      // Pre-initialize audio context
+      const audioContext = await preInitializeAudioContext();
+      
+      // Start microphone permission request in parallel with greeting
       console.log('🎤 Requesting microphone permission...');
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const microphonePromise = navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -419,29 +439,32 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         }
       });
 
-      console.log('✅ Microphone permission granted');
+      // Allow greeting to proceed while waiting for microphone
       setMicrophonePermissionGranted(true);
-      
-      // Store permission in localStorage for persistence
       localStorage.setItem('microphonePermissionGranted', 'true');
       localStorage.setItem('microphonePermissionTime', Date.now().toString());
 
-      // Create audio context for level monitoring
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const analyser = audioContext.createAnalyser();
-      const microphone = audioContext.createMediaStreamSource(stream);
-      
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
-      microphone.connect(analyser);
+      // Wait for microphone stream
+      const stream = await microphonePromise;
+      console.log('✅ Microphone permission granted');
 
-      // Store for cleanup
-      window.fallbackAudioContext = audioContext;
-      window.fallbackStream = stream;
-      window.fallbackAnalyser = analyser;
+      // Setup audio processing if context was created successfully
+      if (audioContext) {
+        const analyser = audioContext.createAnalyser();
+        const microphone = audioContext.createMediaStreamSource(stream);
+        
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        microphone.connect(analyser);
 
-      // Start audio level monitoring
-      startFallbackAudioLevelMonitoring(analyser);
+        // Store for cleanup
+        window.fallbackStream = stream;
+        window.fallbackAnalyser = analyser;
+
+        // Resume context and start monitoring
+        await audioContext.resume();
+        startFallbackAudioLevelMonitoring(analyser);
+      }
 
       console.log('✅ Fallback voice activation initialized');
     } catch (err) {
@@ -449,7 +472,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       setMicrophonePermissionGranted(false);
       throw new Error(`Failed to initialize fallback mode: ${err.message}`);
     }
-  }, [startFallbackAudioLevelMonitoring]);
+  }, [startFallbackAudioLevelMonitoring, preInitializeAudioContext]);
 
   // Initialize WASM mode (original implementation)
   const initializeWASMMode = useCallback(async () => {
@@ -527,21 +550,32 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     console.log('✅ WASM voice activation initialized');
   }, [onNavigateToRecord]);
 
-  // Initialize voice activation with fallback support
+  // Initialize voice activation with fallback support and optimized audio handling
   const initializeVoiceActivation = useCallback(async () => {
     try {
       setError(null);
 
-      // Initialize greeting service first
-      console.log('🎤 Initializing greeting service...');
-      await greetingService.initialize();
-
+      // Start audio context initialization early
+      let audioContextPromise;
       const capabilities = detectDeviceCapabilities();
+      
+      if (capabilities.hasLowMemory || capabilities.isMobile) {
+        console.log('🎤 Pre-initializing audio context...');
+        audioContextPromise = preInitializeAudioContext();
+      }
+
+      // Initialize greeting service in parallel
+      console.log('🎤 Initializing greeting service...');
+      const greetingPromise = greetingService.initialize();
+
+      // Wait for greeting service while audio context initializes in background
+      await greetingPromise;
       
       if (useFallbackMode || capabilities.hasLowMemory) {
         console.log('🔄 Initializing fallback voice activation mode');
+        // Audio context should be ready by now
         await initializeFallbackMode();
-        } else {
+      } else {
         console.log('🚀 Initializing full WASM voice activation mode');
         await initializeWASMMode();
       }
@@ -549,12 +583,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       setIsInitialized(true);
       console.log('✅ Voice activation initialized successfully');
       
-      // Set ready state after a brief delay to ensure everything is properly initialized
-      setTimeout(() => {
-        setVoiceActivationReady(true);
-        setVoiceActivationState('ready');
-        console.log('🎤 Voice activation is now ready');
-      }, 1000);
+      // Set ready state immediately since audio is handled separately
+      setVoiceActivationReady(true);
+      setVoiceActivationState('ready');
+      console.log('🎤 Voice activation is now ready');
       
     } catch (err) {
       console.error('❌ Voice activation initialization failed:', err);
@@ -575,7 +607,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         setError(`Voice activation initialization error: ${err.message}`);
       }
     }
-  }, [useFallbackMode, detectDeviceCapabilities, initializeFallbackMode, initializeWASMMode]);
+  }, [useFallbackMode, detectDeviceCapabilities, initializeFallbackMode, initializeWASMMode, preInitializeAudioContext]);
 
   // Start listening with fallback support and proper state management
   const startListening = useCallback(async () => {
