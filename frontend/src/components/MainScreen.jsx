@@ -26,7 +26,8 @@ const MainScreen = ({ onNavigate }) => {
     voiceActivationReady,
     speechInProgress,
     voiceActivationState,
-    microphoneFullyReady
+    microphoneFullyReady,
+    audioSystemReady
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -211,10 +212,17 @@ const MainScreen = ({ onNavigate }) => {
                 {voiceActivationState === 'initializing' && (
                   <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
-                    <span className="text-sm font-medium text-amber-300">
-                      {useFallbackMode && !microphoneFullyReady 
-                        ? 'Preparing audio system for smooth operation...' 
-                        : 'AI preparing to speak'
+                    <span className="text-sm font-medium text-amber-300">Initializing voice system...</span>
+                  </div>
+                )}
+                
+                {voiceActivationState === 'audio_loading' && (
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 backdrop-blur-sm">
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full animate-pulse mr-3"></div>
+                    <span className="text-sm font-medium text-blue-300">
+                      {useFallbackMode 
+                        ? 'Loading audio system for smooth operation...' 
+                        : 'Loading AI audio models...'
                       }
                     </span>
                   </div>
@@ -370,7 +378,9 @@ const MainScreen = ({ onNavigate }) => {
                         ? 'Mobile-optimized voice mode • AI speaking'
                         : voiceActivationState === 'listening'
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
-                        : !microphoneFullyReady
+                        : voiceActivationState === 'audio_loading'
+                        ? 'Mobile-optimized voice mode • Loading audio system...'
+                        : !audioSystemReady
                         ? 'Mobile-optimized voice mode • Preparing audio system...'
                         : speechEnabled 
                         ? 'Mobile-optimized voice mode • Ready'
