@@ -213,7 +213,7 @@ const MainScreen = ({ onNavigate }) => {
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
                     <span className="text-sm font-medium text-amber-300">
                       {useFallbackMode && !microphoneFullyReady 
-                        ? 'Preparing microphone for smooth operation...' 
+                        ? 'Preparing audio system for smooth operation...' 
                         : 'AI preparing to speak'
                       }
                     </span>
@@ -371,7 +371,7 @@ const MainScreen = ({ onNavigate }) => {
                         : voiceActivationState === 'listening'
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
                         : !microphoneFullyReady
-                        ? 'Mobile-optimized voice mode • Preparing microphone...'
+                        ? 'Mobile-optimized voice mode • Preparing audio system...'
                         : speechEnabled 
                         ? 'Mobile-optimized voice mode • Ready'
                         : 'Tap anywhere to enable voice features'

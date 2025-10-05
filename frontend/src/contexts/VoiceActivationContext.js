@@ -429,6 +429,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
       // Create audio context for level monitoring
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      
+      // Ensure audio context is running (required for mobile browsers)
+      if (audioContext.state === 'suspended') {
+        console.log('🎤 Resuming suspended audio context...');
+        await audioContext.resume();
+      }
+      
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
       
@@ -441,14 +448,35 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       window.fallbackStream = stream;
       window.fallbackAnalyser = analyser;
 
-      // Start audio level monitoring
-      startFallbackAudioLevelMonitoring(analyser);
-
-      // Wait a bit more to ensure audio context is fully ready
-      setTimeout(() => {
-        setMicrophoneFullyReady(true);
-        console.log('✅ Microphone fully ready for smooth operation');
-      }, 800); // Give extra time for audio context to stabilize
+      // Wait for audio context to be fully running
+      const waitForAudioContext = async () => {
+        let attempts = 0;
+        const maxAttempts = 10;
+        
+        while (audioContext.state !== 'running' && attempts < maxAttempts) {
+          console.log(`🎤 Audio context state: ${audioContext.state}, waiting...`);
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        
+        if (audioContext.state === 'running') {
+          console.log('✅ Audio context is running, starting monitoring...');
+          // Start audio level monitoring
+          startFallbackAudioLevelMonitoring(analyser);
+          
+          // Give a bit more time for the audio pipeline to stabilize
+          setTimeout(() => {
+            setMicrophoneFullyReady(true);
+            console.log('✅ Microphone fully ready for smooth operation');
+          }, 300);
+        } else {
+          console.warn('⚠️ Audio context failed to start, proceeding anyway...');
+          startFallbackAudioLevelMonitoring(analyser);
+          setMicrophoneFullyReady(true);
+        }
+      };
+      
+      await waitForAudioContext();
 
       console.log('✅ Fallback voice activation initialized');
     } catch (err) {
@@ -531,8 +559,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     localStorage.setItem('microphonePermissionGranted', 'true');
     localStorage.setItem('microphonePermissionTime', Date.now().toString());
     
-    // For WASM mode, microphone is ready immediately
-    setMicrophoneFullyReady(true);
+    // For WASM mode, wait a bit for the service to be fully ready
+    setTimeout(() => {
+      setMicrophoneFullyReady(true);
+      console.log('✅ WASM microphone fully ready for smooth operation');
+    }, 500); // Give WASM time to fully initialize
     
     console.log('✅ WASM voice activation initialized');
   }, [onNavigateToRecord]);
@@ -664,11 +695,24 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // On mobile, we need user interaction for TTS AND microphone permission for listening
       if (useFallbackMode) {
         if (microphonePermissionGranted && microphoneFullyReady) {
-          console.log('🎤 Mobile mode: Microphone fully ready, starting smooth greeting...');
-          // Start greeting after microphone is fully ready for smooth operation
-          setTimeout(() => {
-            triggerGreetingSpeech();
-          }, 200); // Shorter delay since microphone is already ready
+          // Additional check: ensure audio context is running
+          const audioContext = window.fallbackAudioContext;
+          if (audioContext && audioContext.state === 'running') {
+            console.log('🎤 Mobile mode: Audio context running, starting smooth greeting...');
+            // Start greeting after microphone is fully ready for smooth operation
+            setTimeout(() => {
+              triggerGreetingSpeech();
+            }, 200); // Shorter delay since microphone is already ready
+          } else {
+            console.log('🎤 Mobile mode: Audio context not running yet, waiting...');
+            // Wait a bit more and try again
+            setTimeout(() => {
+              if (audioContext && audioContext.state === 'running') {
+                console.log('🎤 Mobile mode: Audio context now running, starting greeting...');
+                triggerGreetingSpeech();
+              }
+            }, 500);
+          }
         } else if (microphonePermissionGranted && !microphoneFullyReady) {
           console.log('🎤 Mobile mode: Microphone permission granted, waiting for full readiness...');
         } else {
@@ -684,19 +728,28 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     }
   }, [voiceActivationReady, greetingInitialized, triggerGreetingSpeech, useFallbackMode, microphonePermissionGranted, microphoneFullyReady]);
 
-  // Fallback greeting trigger - if greeting hasn't been triggered after 5 seconds, try anyway
+  // Fallback greeting trigger - if greeting hasn't been triggered after 7 seconds, try anyway
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
       if (isInitialized && !greetingInitialized && !speechInProgress) {
         // Only trigger fallback if microphone is ready (for mobile) or if it's desktop
-        if ((useFallbackMode && microphoneFullyReady) || !useFallbackMode) {
-          console.log('🎤 Fallback: Triggering greeting after timeout...');
+        if (useFallbackMode && microphoneFullyReady) {
+          // Additional check for audio context
+          const audioContext = window.fallbackAudioContext;
+          if (audioContext && audioContext.state === 'running') {
+            console.log('🎤 Fallback: Audio context running, triggering greeting after timeout...');
+            triggerGreetingSpeech();
+          } else {
+            console.log('🎤 Fallback: Audio context not ready, waiting longer...');
+          }
+        } else if (!useFallbackMode) {
+          console.log('🎤 Fallback: Desktop mode, triggering greeting after timeout...');
           triggerGreetingSpeech();
         } else {
           console.log('🎤 Fallback: Waiting for microphone to be fully ready...');
         }
       }
-    }, 5000); // Increased timeout to give more time for mobile initialization
+    }, 7000); // Increased timeout to give more time for mobile initialization
 
     return () => clearTimeout(fallbackTimer);
   }, [isInitialized, greetingInitialized, speechInProgress, triggerGreetingSpeech, useFallbackMode, microphoneFullyReady]);
