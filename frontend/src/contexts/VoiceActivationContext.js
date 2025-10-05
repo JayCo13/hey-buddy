@@ -28,10 +28,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     isMobile: false
   });
 
-  // Simplified state management
+  // New state variables for proper state management
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceActivationReady, setVoiceActivationReady] = useState(false);
-  const [voiceActivationState, setVoiceActivationState] = useState('initializing'); // 'initializing', 'audio_loading', 'ready', 'speaking', 'listening', 'error'
-  const [audioSystemReady, setAudioSystemReady] = useState(false);
+  const [speechInProgress, setSpeechInProgress] = useState(false);
+  const [voiceActivationState, setVoiceActivationState] = useState('initializing'); // 'initializing', 'ready', 'speaking', 'listening', 'error'
 
   // Ref to avoid circular dependency
   const startFallbackListeningRef = useRef();
@@ -61,82 +62,164 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     return { isMobile, hasLowMemory, supportsWASM };
   }, []);
 
-  // Simple start listening function
-  const startListening = useCallback(async () => {
-    try {
-      console.log('🎤 Starting listening...');
-      setVoiceActivationState('listening');
-      
-      if (useFallbackMode) {
-        await startFallbackListeningRef.current();
-      } else {
-        const success = await voiceActivationService.startListening();
-        if (!success) {
-          throw new Error('Failed to start voice activation service');
-        }
-      }
-      
-      setIsListening(true);
-    } catch (err) {
-      console.error('Failed to start listening:', err);
-      setVoiceActivationState('error');
-      setError(`Failed to start listening: ${err.message}`);
-    }
-  }, [useFallbackMode]);
-
-  // NEW SIMPLE GREETING FUNCTION - Fast and smooth
+  // Trigger greeting speech with proper state management
   const triggerGreetingSpeech = useCallback(async () => {
     try {
-      console.log('🎤 Starting simple greeting...');
+      // Check if we're in a valid state to start greeting (less restrictive)
+      if (speechInProgress) {
+        console.log('🎤 Cannot start greeting - speech already in progress');
+        return;
+      }
+
+      console.log('🎤 Triggering greeting speech...');
       setVoiceActivationState('speaking');
+      setIsSpeaking(true);
+      setSpeechInProgress(true);
+      
+      const greetingObj = await greetingService.generateGreeting();
+      console.log('🎤 Greeting received:', greetingObj);
+      
+      // Extract the text from the greeting object
+      const greetingText = greetingObj.text || greetingObj;
+      console.log('🎤 Greeting text:', greetingText);
+      
+      setCurrentGreeting(greetingObj);
       setGreetingInitialized(true);
       
-      // Get simple greeting text (no complex AI generation)
-      const greetingText = "Hey Jayden! I'm ready to help you.";
-      setCurrentGreeting({ text: greetingText, emoji: '👋' });
+      // Completely pause voice activation during TTS
+      await pauseVoiceActivationCompletely();
       
-      // Simple TTS without complex state management
+      // Use TTS to speak the greeting
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(greetingText);
-        utterance.rate = 1.2; // Slightly faster for better UX
-        utterance.volume = 0.8;
+        utterance.rate = 1.0; // Faster rate for smoother experience
+        utterance.pitch = 1.0;
+        utterance.volume = 0.9; // Higher volume for clarity
+        
+        utterance.onstart = () => {
+          console.log('🎤 TTS started');
+        };
         
         utterance.onend = () => {
-          console.log('🎤 Greeting completed - starting listening');
-          setVoiceActivationState('ready');
+          console.log('🎤 Greeting speech completed');
+          setIsSpeaking(false);
+          setSpeechInProgress(false);
           
-          // Start listening immediately after greeting
-          setTimeout(() => {
-            startListening();
-          }, 100); // Very short delay
+          // Wait a bit before resuming voice activation
+          setTimeout(async () => {
+            console.log('🎤 Resuming voice activation after greeting...');
+            await resumeVoiceActivation();
+            setVoiceActivationState('ready');
+            
+            // Auto-start hands-free listening after greeting
+            setTimeout(() => {
+              console.log('🎤 Auto-starting hands-free listening...');
+              startListening();
+            }, 500); // Shorter delay for smoother experience
+          }, 300); // Brief pause to ensure TTS is completely finished
         };
         
-        utterance.onerror = () => {
-          console.log('🎤 TTS failed - starting listening anyway');
-          setVoiceActivationState('ready');
-          setTimeout(() => {
-            startListening();
-          }, 100);
+        utterance.onerror = (event) => {
+          console.error('🎤 TTS Error:', event.error);
+          setIsSpeaking(false);
+          setSpeechInProgress(false);
+          
+          // Resume voice activation even if TTS fails
+          setTimeout(async () => {
+            console.log('🎤 Resuming voice activation after TTS error...');
+            await resumeVoiceActivation();
+            setVoiceActivationState('ready');
+            
+            // Start listening after error recovery
+            setTimeout(() => {
+              console.log('🎤 Starting listening after TTS error recovery...');
+              startListening();
+            }, 500);
+          }, 300);
         };
         
-        // Speak immediately
-        speechSynthesis.speak(utterance);
+        // Try to speak, but don't fail if it doesn't work on mobile
+        try {
+          speechSynthesis.speak(utterance);
+        } catch (ttsError) {
+          console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
+          setIsSpeaking(false);
+          setSpeechInProgress(false);
+          
+          // Resume voice activation even if TTS fails
+          setTimeout(async () => {
+            console.log('🎤 Resuming voice activation after TTS failure...');
+            await resumeVoiceActivation();
+            setVoiceActivationState('ready');
+            
+            // Start listening after failure recovery
+            setTimeout(() => {
+              console.log('🎤 Starting listening after TTS failure recovery...');
+              startListening();
+            }, 500);
+          }, 300);
+        }
       } else {
-        // No TTS available - just start listening
-        console.log('🎤 No TTS - starting listening immediately');
+        console.warn('🎤 Speech synthesis not available');
+        setIsSpeaking(false);
+        setSpeechInProgress(false);
         setVoiceActivationState('ready');
+        
+        // Start listening immediately if no TTS
         setTimeout(() => {
+          console.log('🎤 Starting listening (no TTS)...');
           startListening();
-        }, 100);
+        }, 500);
       }
     } catch (err) {
-      console.error('Greeting error:', err);
-      setVoiceActivationState('ready');
-      setTimeout(() => {
-        startListening();
-      }, 100);
+      console.error('Failed to trigger greeting speech:', err);
+      setIsSpeaking(false);
+      setSpeechInProgress(false);
+      setVoiceActivationState('error');
+      setError(`Greeting failed: ${err.message}`);
     }
-  }, [startListening]);
+  }, [useFallbackMode, voiceActivationState, speechInProgress]);
+
+  // Completely pause voice activation during TTS
+  const pauseVoiceActivationCompletely = useCallback(async () => {
+    console.log('🎤 Pausing voice activation completely...');
+    
+    if (useFallbackMode) {
+      // Stop fallback recognition
+      if (window.fallbackRecognition) {
+        window.fallbackRecognition.stop();
+        window.fallbackRecognition = null;
+      }
+      
+      // Stop audio level monitoring
+      if (window.fallbackAnalyser) {
+        // Clear any ongoing monitoring
+        window.fallbackAnalyser = null;
+      }
+    } else {
+      // Pause WASM voice activation
+      voiceActivationService.pauseVoiceActivation();
+    }
+    
+    setIsListening(false);
+    setAudioLevel(0.05); // Reset audio level
+  }, [useFallbackMode]);
+
+  // Resume voice activation after TTS
+  const resumeVoiceActivation = useCallback(async () => {
+    console.log('🎤 Resuming voice activation...');
+    
+    if (useFallbackMode) {
+      // Restart fallback recognition if needed
+      if (!window.fallbackRecognition) {
+        // Will be restarted by startListening if needed
+        console.log('🎤 Fallback recognition will be restarted when needed');
+      }
+    } else {
+      // Resume WASM voice activation
+      voiceActivationService.resumeVoiceActivation();
+    }
+  }, [useFallbackMode]);
 
   // Start fallback listening using Web Speech API
   const startFallbackListening = useCallback(async () => {
@@ -323,13 +406,9 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       throw new Error('Speech recognition not supported on this device');
     }
 
-    // Set state to audio loading
-    setVoiceActivationState('audio_loading');
-    console.log('🎤 Starting audio system initialization...');
-
     // Initialize basic microphone access for audio level monitoring
     try {
-      console.log('🎤 Step 1: Requesting microphone permission...');
+      console.log('🎤 Requesting microphone permission...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -340,24 +419,15 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         }
       });
 
-      console.log('✅ Step 1: Microphone permission granted');
+      console.log('✅ Microphone permission granted');
       setMicrophonePermissionGranted(true);
       
       // Store permission in localStorage for persistence
       localStorage.setItem('microphonePermissionGranted', 'true');
       localStorage.setItem('microphonePermissionTime', Date.now().toString());
 
-      console.log('🎤 Step 2: Creating audio context...');
       // Create audio context for level monitoring
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      
-      // Ensure audio context is running (required for mobile browsers)
-      if (audioContext.state === 'suspended') {
-        console.log('🎤 Step 3: Resuming suspended audio context...');
-        await audioContext.resume();
-      }
-      
-      console.log('🎤 Step 4: Setting up audio pipeline...');
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
       
@@ -370,61 +440,32 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       window.fallbackStream = stream;
       window.fallbackAnalyser = analyser;
 
-      console.log('🎤 Step 5: Quick audio context check...');
-      // Simple check - if not running, try to resume once
-      if (audioContext.state !== 'running') {
-        console.log(`🎤 Audio context state: ${audioContext.state}, resuming...`);
-        await audioContext.resume();
-        await new Promise(resolve => setTimeout(resolve, 200)); // Quick wait
-      }
-      
-      console.log('🎤 Step 6: Starting audio monitoring...');
       // Start audio level monitoring
       startFallbackAudioLevelMonitoring(analyser);
-      
-      console.log('🎤 Step 7: Quick stabilization...');
-      // Short stabilization
-      await new Promise(resolve => setTimeout(resolve, 300)); // Much shorter
-      
-      console.log('✅ Audio system ready!');
-      setAudioSystemReady(true);
-      setVoiceActivationState('ready');
 
       console.log('✅ Fallback voice activation initialized');
+      
+      // Add delay to ensure microphone is fully ready before greeting
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (err) {
       console.error('❌ Microphone permission denied or failed:', err);
       setMicrophonePermissionGranted(false);
-      setVoiceActivationState('error');
       throw new Error(`Failed to initialize fallback mode: ${err.message}`);
     }
   }, [startFallbackAudioLevelMonitoring]);
 
   // Initialize WASM mode (original implementation)
   const initializeWASMMode = useCallback(async () => {
-    // Set state to audio loading
-    setVoiceActivationState('audio_loading');
-    console.log('🎤 Starting WASM audio system initialization...');
-
-    console.log('🎤 Step 1: Initializing Whisper service...');
     // Initialize Whisper service with progress tracking
     await whisperService.initialize((progress) => {
       console.log(`Whisper loading: ${progress.stage} - ${progress.message}`);
     });
 
-    console.log('🎤 Step 2: Initializing voice activation service...');
     // Initialize voice activation service
     const success = await voiceActivationService.initialize();
     if (!success) {
       throw new Error('Failed to initialize voice activation service');
     }
-
-    console.log('🎤 Step 3: Quick WASM stabilization...');
-    // Quick stabilization
-    await new Promise(resolve => setTimeout(resolve, 200)); // Much faster
-    
-    console.log('✅ WASM audio system ready!');
-    setAudioSystemReady(true);
-    setVoiceActivationState('ready');
 
     // Set up callbacks
     voiceActivationService.setWakeWordCallback((wakeWord, transcription) => {
@@ -511,12 +552,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       setIsInitialized(true);
       console.log('✅ Voice activation initialized successfully');
       
-      // Set ready state after a brief delay to ensure everything is properly initialized
+      // Set ready state after a longer delay on mobile to ensure smooth initialization
+      const readyDelay = useFallbackMode || capabilities.hasLowMemory ? 1500 : 1000;
       setTimeout(() => {
         setVoiceActivationReady(true);
         setVoiceActivationState('ready');
         console.log('🎤 Voice activation is now ready');
-      }, 1000);
+      }, readyDelay);
       
     } catch (err) {
       console.error('❌ Voice activation initialization failed:', err);
@@ -539,6 +581,34 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     }
   }, [useFallbackMode, detectDeviceCapabilities, initializeFallbackMode, initializeWASMMode]);
 
+  // Start listening with fallback support and proper state management
+  const startListening = useCallback(async () => {
+    try {
+      // Check if we're in a valid state to start listening (less restrictive)
+      if (speechInProgress) {
+        console.log('🎤 Cannot start listening - speech in progress');
+        return;
+      }
+
+      console.log('🎤 Starting listening...');
+      setVoiceActivationState('listening');
+      
+      if (useFallbackMode) {
+        await startFallbackListeningRef.current();
+      } else {
+        const success = await voiceActivationService.startListening();
+        if (!success) {
+          throw new Error('Failed to start voice activation service');
+        }
+      }
+      
+      setIsListening(true);
+    } catch (err) {
+      console.error('Failed to start listening:', err);
+      setVoiceActivationState('error');
+      setError(`Failed to start listening: ${err.message}`);
+    }
+  }, [useFallbackMode, voiceActivationState, speechInProgress]);
 
   // Stop listening with proper state management
   const stopListening = useCallback(() => {
@@ -580,18 +650,45 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     };
   }, [initializeVoiceActivation, useFallbackMode]);
 
-  // NO AUTOMATIC GREETING - Let audio load completely, then start listening
+  // Trigger immediate greeting when voice activation is ready (only once)
   useEffect(() => {
-    if (voiceActivationReady && audioSystemReady && !greetingInitialized) {
-      console.log('🎤 Systems ready - starting listening directly (no greeting)');
-      setGreetingInitialized(true);
+    if (voiceActivationReady && !greetingInitialized) {
+      console.log('🎤 Voice activation ready, checking conditions for greeting...');
       
-      // Just start listening immediately - no greeting, no lag
-      setTimeout(() => {
-        startListening();
-      }, 100);
+      // On mobile, we need user interaction for TTS AND microphone permission for listening
+      if (useFallbackMode) {
+        if (microphonePermissionGranted) {
+          console.log('🎤 Mobile mode: Microphone permission granted, starting greeting...');
+          // Longer delay on mobile to ensure everything is settled
+          setTimeout(() => {
+            triggerGreetingSpeech();
+          }, 1000); // Increased delay for smoother mobile experience
+        } else {
+          console.log('🎤 Mobile mode: Waiting for microphone permission before greeting...');
+        }
+      } else {
+        // Desktop: play greeting first (no microphone permission needed for TTS)
+        console.log('🎤 Desktop mode: Starting greeting immediately...');
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 500);
+      }
     }
-  }, [voiceActivationReady, audioSystemReady, greetingInitialized, startListening]);
+  }, [voiceActivationReady, greetingInitialized, triggerGreetingSpeech, useFallbackMode, microphonePermissionGranted]);
+
+  // Fallback greeting trigger - if greeting hasn't been triggered after timeout, try anyway
+  useEffect(() => {
+    // Longer timeout on mobile to avoid conflicts
+    const timeout = useFallbackMode ? 5000 : 3000;
+    const fallbackTimer = setTimeout(() => {
+      if (isInitialized && !greetingInitialized && !speechInProgress) {
+        console.log('🎤 Fallback: Triggering greeting after timeout...');
+        triggerGreetingSpeech();
+      }
+    }, timeout);
+
+    return () => clearTimeout(fallbackTimer);
+  }, [isInitialized, greetingInitialized, speechInProgress, triggerGreetingSpeech, useFallbackMode]);
 
   // Restart listening when user returns to the page
   useEffect(() => {
@@ -625,10 +722,11 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     useFallbackMode,
     microphonePermissionGranted,
     deviceCapabilities,
-    // Simplified state variables
+    // New state variables
+    isSpeaking,
     voiceActivationReady,
+    speechInProgress,
     voiceActivationState,
-    audioSystemReady,
     startListening,
     stopListening,
     triggerGreetingSpeech,

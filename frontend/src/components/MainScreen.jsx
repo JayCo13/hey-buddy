@@ -21,10 +21,11 @@ const MainScreen = ({ onNavigate }) => {
     greetingInitialized,
     triggerGreetingSpeech,
     useFallbackMode,
-    // Simplified state variables
+    // New state variables
+    isSpeaking,
     voiceActivationReady,
-    voiceActivationState,
-    audioSystemReady
+    speechInProgress,
+    voiceActivationState
   } = useVoiceActivation();
 
   const trendingVoices = [
@@ -49,17 +50,20 @@ const MainScreen = ({ onNavigate }) => {
 
   // Enable speech on first user interaction
   const enableSpeech = useCallback(async () => {
-    if (!speechEnabled) {
+    if (!speechEnabled && voiceActivationReady) {
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Only trigger greeting on mobile if it hasn't been played yet
-      if (useFallbackMode && !greetingInitialized) {
+      // Only trigger greeting on mobile if it hasn't been played yet and voice is ready
+      if (useFallbackMode && !greetingInitialized && !isSpeaking && !speechInProgress) {
         console.log('🎤 Mobile: Triggering greeting after user interaction');
-        await triggerGreetingSpeech();
+        // Add small delay to ensure user interaction is complete
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 300);
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, isSpeaking, speechInProgress]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -115,7 +119,7 @@ const MainScreen = ({ onNavigate }) => {
     let hasTriggered = false;
     
     const handleUserInteraction = () => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
         hasTriggered = true;
         console.log('User interaction detected, enabling speech automatically...');
         enableSpeech();
@@ -129,14 +133,15 @@ const MainScreen = ({ onNavigate }) => {
       document.addEventListener(event, handleUserInteraction, { once: true, passive: true });
     });
 
-    // Fallback timer with longer delay to reduce aggressive triggering
+    // Longer fallback timer on mobile to reduce aggressive triggering
+    const autoEnableDelay = useFallbackMode ? 5000 : 3000;
     const autoEnableTimer = setTimeout(() => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
         hasTriggered = true;
         console.log('Attempting auto-enable speech...');
         enableSpeech();
       }
-    }, 3000);
+    }, autoEnableDelay);
 
     return () => {
       events.forEach(event => {
@@ -144,7 +149,7 @@ const MainScreen = ({ onNavigate }) => {
       });
       clearTimeout(autoEnableTimer);
     };
-  }, [speechEnabled, currentGreeting, greetingInitialized]);
+  }, [speechEnabled, currentGreeting, greetingInitialized, voiceActivationReady, useFallbackMode, enableSpeech]);
 
 
   const generateWaveform = () => {
@@ -194,7 +199,7 @@ const MainScreen = ({ onNavigate }) => {
       {/* Intelligent Greeting Section */}
       <div className="px-6 mb-6">
         {greetingInitialized && currentGreeting ? (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in">
             {/* Main Greeting */}
             <div className="text-center space-y-6">
               <div className="flex items-center justify-center space-x-3">
@@ -207,21 +212,9 @@ const MainScreen = ({ onNavigate }) => {
               {/* Modern Speech Status Indicator */}
               <div className="flex justify-center">
                 {voiceActivationState === 'initializing' && (
-                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm animate-fade-in">
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
-                    <span className="text-sm font-medium text-amber-300">Initializing voice system...</span>
-                  </div>
-                )}
-                
-                {voiceActivationState === 'audio_loading' && (
-                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-indigo-500/20 border border-blue-500/30 backdrop-blur-sm">
-                    <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-indigo-400 rounded-full animate-pulse mr-3"></div>
-                    <span className="text-sm font-medium text-blue-300">
-                      {useFallbackMode 
-                        ? 'Loading audio system for smooth operation...' 
-                        : 'Loading AI audio models...'
-                      }
-                    </span>
+                    <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
                   </div>
                 )}
                 
@@ -375,11 +368,9 @@ const MainScreen = ({ onNavigate }) => {
                         ? 'Mobile-optimized voice mode • AI speaking'
                         : voiceActivationState === 'listening'
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
-                        : voiceActivationState === 'audio_loading'
-                        ? 'Mobile-optimized voice mode • Loading audio system...'
-                        : !audioSystemReady
-                        ? 'Mobile-optimized voice mode • Preparing audio system...'
-                        : 'Mobile-optimized voice mode • Ready'
+                        : speechEnabled 
+                        ? 'Mobile-optimized voice mode • Ready'
+                        : 'Tap anywhere to enable voice features'
                       }
                     </p>
                   </div>
