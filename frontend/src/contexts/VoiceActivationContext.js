@@ -444,9 +444,6 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       startFallbackAudioLevelMonitoring(analyser);
 
       console.log('✅ Fallback voice activation initialized');
-      
-      // Add delay to ensure microphone is fully ready before greeting
-      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (err) {
       console.error('❌ Microphone permission denied or failed:', err);
       setMicrophonePermissionGranted(false);
@@ -552,13 +549,12 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       setIsInitialized(true);
       console.log('✅ Voice activation initialized successfully');
       
-      // Set ready state after a longer delay on mobile to ensure smooth initialization
-      const readyDelay = useFallbackMode || capabilities.hasLowMemory ? 1500 : 1000;
+      // Set ready state after a brief delay to ensure everything is properly initialized
       setTimeout(() => {
         setVoiceActivationReady(true);
         setVoiceActivationState('ready');
         console.log('🎤 Voice activation is now ready');
-      }, readyDelay);
+      }, 1000);
       
     } catch (err) {
       console.error('❌ Voice activation initialization failed:', err);
@@ -659,10 +655,10 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       if (useFallbackMode) {
         if (microphonePermissionGranted) {
           console.log('🎤 Mobile mode: Microphone permission granted, starting greeting...');
-          // Longer delay on mobile to ensure everything is settled
+          // Start greeting first, then listening will start after greeting completes
           setTimeout(() => {
             triggerGreetingSpeech();
-          }, 1000); // Increased delay for smoother mobile experience
+          }, 500);
         } else {
           console.log('🎤 Mobile mode: Waiting for microphone permission before greeting...');
         }
@@ -671,24 +667,22 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
         console.log('🎤 Desktop mode: Starting greeting immediately...');
         setTimeout(() => {
           triggerGreetingSpeech();
-        }, 500);
+        }, 500); // Reduced delay for faster greeting
       }
     }
   }, [voiceActivationReady, greetingInitialized, triggerGreetingSpeech, useFallbackMode, microphonePermissionGranted]);
 
-  // Fallback greeting trigger - if greeting hasn't been triggered after timeout, try anyway
+  // Fallback greeting trigger - if greeting hasn't been triggered after 3 seconds, try anyway
   useEffect(() => {
-    // Longer timeout on mobile to avoid conflicts
-    const timeout = useFallbackMode ? 5000 : 3000;
     const fallbackTimer = setTimeout(() => {
       if (isInitialized && !greetingInitialized && !speechInProgress) {
         console.log('🎤 Fallback: Triggering greeting after timeout...');
         triggerGreetingSpeech();
       }
-    }, timeout);
+    }, 3000);
 
     return () => clearTimeout(fallbackTimer);
-  }, [isInitialized, greetingInitialized, speechInProgress, triggerGreetingSpeech, useFallbackMode]);
+  }, [isInitialized, greetingInitialized, speechInProgress, triggerGreetingSpeech]);
 
   // Restart listening when user returns to the page
   useEffect(() => {

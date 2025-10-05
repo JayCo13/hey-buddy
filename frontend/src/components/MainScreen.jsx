@@ -48,22 +48,31 @@ const MainScreen = ({ onNavigate }) => {
     }
   };
 
-  // Enable speech on first user interaction
+  // Enable speech on first user interaction with smooth coordination
   const enableSpeech = useCallback(async () => {
-    if (!speechEnabled && voiceActivationReady) {
-      setSpeechEnabled(true);
+    if (!speechEnabled) {
       console.log('Speech enabled by user interaction');
       
-      // Only trigger greeting on mobile if it hasn't been played yet and voice is ready
-      if (useFallbackMode && !greetingInitialized && !isSpeaking && !speechInProgress) {
-        console.log('🎤 Mobile: Triggering greeting after user interaction');
-        // Add small delay to ensure user interaction is complete
-        setTimeout(() => {
-          triggerGreetingSpeech();
-        }, 300);
+      // First set speech as enabled to prevent multiple triggers
+      setSpeechEnabled(true);
+      
+      // Add a small delay before triggering greeting on mobile
+      if (useFallbackMode && !greetingInitialized) {
+        // Wait for any pending microphone initialization
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.log('🎤 Mobile: Triggering greeting after microphone setup');
+        if (!greetingInitialized) {
+          try {
+            await triggerGreetingSpeech();
+          } catch (error) {
+            console.warn('Failed to trigger greeting:', error);
+            // Continue anyway - the greeting will show when ready
+          }
+        }
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, isSpeaking, speechInProgress]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -114,42 +123,73 @@ const MainScreen = ({ onNavigate }) => {
     checkMicrophonePermission();
   }, []);
 
-  // Auto-enable speech on first user interaction (optimized)
+  // Auto-enable speech on first user interaction with smooth coordination
   useEffect(() => {
     let hasTriggered = false;
+    let setupTimeout = null;
     
-    const handleUserInteraction = () => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
+    const handleUserInteraction = async () => {
+      if (!hasTriggered && !speechEnabled) {
         hasTriggered = true;
-        console.log('User interaction detected, enabling speech automatically...');
-        enableSpeech();
+        console.log('User interaction detected, coordinating speech setup...');
+        
+        // Clear any pending auto-enable timer
+        if (setupTimeout) {
+          clearTimeout(setupTimeout);
+        }
+        
+        // Wait for greeting to be ready if needed
+        if (!currentGreeting) {
+          console.log('Waiting for greeting to be ready...');
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+        
+        // Enable speech with smooth coordination
+        if (!speechEnabled) {
+          console.log('Enabling speech with coordination...');
+          await enableSpeech();
+        }
       }
     };
 
-    // Use a single, more specific event listener
+    // Use a single, more specific event listener with passive option for better performance
     const events = ['click', 'keydown', 'touchstart'];
     
     events.forEach(event => {
       document.addEventListener(event, handleUserInteraction, { once: true, passive: true });
     });
 
-    // Longer fallback timer on mobile to reduce aggressive triggering
-    const autoEnableDelay = useFallbackMode ? 5000 : 3000;
-    const autoEnableTimer = setTimeout(() => {
-      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized && voiceActivationReady) {
-        hasTriggered = true;
-        console.log('Attempting auto-enable speech...');
-        enableSpeech();
+    // Smoother fallback timer with progressive checks
+    setupTimeout = setTimeout(async () => {
+      if (!hasTriggered && !speechEnabled) {
+        console.log('Auto-setup: Checking conditions...');
+        
+        // Progressive enabling with proper coordination
+        if (currentGreeting || greetingInitialized) {
+          hasTriggered = true;
+          console.log('Auto-setup: Conditions met, enabling speech...');
+          await enableSpeech();
+        } else {
+          console.log('Auto-setup: Waiting for greeting initialization...');
+          // Additional wait for greeting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          if (!hasTriggered && !speechEnabled) {
+            hasTriggered = true;
+            await enableSpeech();
+          }
+        }
       }
-    }, autoEnableDelay);
+    }, 2000);
 
     return () => {
       events.forEach(event => {
         document.removeEventListener(event, handleUserInteraction);
       });
-      clearTimeout(autoEnableTimer);
+      if (setupTimeout) {
+        clearTimeout(setupTimeout);
+      }
     };
-  }, [speechEnabled, currentGreeting, greetingInitialized, voiceActivationReady, useFallbackMode, enableSpeech]);
+  }, [speechEnabled, currentGreeting, greetingInitialized, enableSpeech]);
 
 
   const generateWaveform = () => {
@@ -199,20 +239,20 @@ const MainScreen = ({ onNavigate }) => {
       {/* Intelligent Greeting Section */}
       <div className="px-6 mb-6">
         {greetingInitialized && currentGreeting ? (
-          <div className="space-y-4 animate-fade-in">
-            {/* Main Greeting */}
+          <div className="space-y-4">
+            {/* Main Greeting with smooth transition */}
             <div className="text-center space-y-6">
               <div className="flex items-center justify-center space-x-3">
-                {/* Modern Hand Wave Icon */}
-                <h1 className="text-3xl font-light text-white/90 tracking-wide">
-                👋🏻 Hey Jayden
+                {/* Modern Hand Wave Icon with dynamic greeting */}
+                <h1 className="text-3xl font-light text-white/90 tracking-wide transition-opacity duration-500 ease-in-out">
+                  {currentGreeting.text || "👋🏻 Hey Jayden"}
                 </h1>
               </div>
               
               {/* Modern Speech Status Indicator */}
               <div className="flex justify-center">
                 {voiceActivationState === 'initializing' && (
-                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm animate-fade-in">
+                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 backdrop-blur-sm">
                     <div className="w-2 h-2 bg-gradient-to-r from-amber-400 to-orange-400 rounded-full animate-pulse mr-3"></div>
                     <span className="text-sm font-medium text-amber-300">AI preparing to speak</span>
                   </div>
