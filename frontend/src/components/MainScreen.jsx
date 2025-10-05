@@ -209,7 +209,7 @@ const MainScreen = ({ onNavigate }) => {
               <div className="flex items-center justify-center space-x-3">
                 {/* Dynamic AI Greeting with Emoji */}
                 <h1 className="text-3xl font-light text-white/90 tracking-wide opacity-0 animate-fadeIn">
-                  {currentGreeting.greeting}
+                {currentGreeting.greeting} 👋🏻 Hi Jayden                 
                 </h1>
               </div>
               
