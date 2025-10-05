@@ -580,16 +580,18 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     };
   }, [initializeVoiceActivation, useFallbackMode]);
 
-  // NEW SIMPLE GREETING SYSTEM - No complex logic, just smooth operation
+  // NO AUTOMATIC GREETING - Let audio load completely, then start listening
   useEffect(() => {
-    // Simple rule: Only greet when everything is ready and user hasn't been greeted yet
     if (voiceActivationReady && audioSystemReady && !greetingInitialized) {
-      console.log('🎤 Systems ready - starting simple greeting...');
+      console.log('🎤 Systems ready - starting listening directly (no greeting)');
+      setGreetingInitialized(true);
       
-      // Immediate greeting - no delays, no complex logic
-      triggerGreetingSpeech();
+      // Just start listening immediately - no greeting, no lag
+      setTimeout(() => {
+        startListening();
+      }, 100);
     }
-  }, [voiceActivationReady, audioSystemReady, greetingInitialized, triggerGreetingSpeech]);
+  }, [voiceActivationReady, audioSystemReady, greetingInitialized, startListening]);
 
   // Restart listening when user returns to the page
   useEffect(() => {
