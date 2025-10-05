@@ -1,7 +1,6 @@
 import { syncQueueService, settingsService } from './databaseService';
 
-// Backend API configuration
-const API_BASE_URL = process.env.REACT_APP_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:8001/api/v1' : 'https://your-backend-url.com/api/v1');
+// Note: Backend API removed - this service now works with local storage only
 
 class SyncService {
   constructor() {
@@ -39,34 +38,8 @@ class SyncService {
     return this.isOnline;
   }
 
-  // Generic API request with error handling
-  async apiRequest(endpoint, options = {}) {
-    try {
-      const token = localStorage.getItem('access_token');
-      const headers = {
-        'Content-Type': 'application/json',
-        ...options.headers
-      };
-
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
-    }
-  }
+  // Note: API requests removed since backend is no longer available
+  // This service now works with local storage only
 
   // Add operation to sync queue
   async queueOperation(operation, table, data) {
@@ -78,23 +51,24 @@ class SyncService {
     }
   }
 
-  // Process sync queue
+  // Process sync queue (local only now)
   async processSyncQueue() {
-    if (this.syncInProgress || !this.isOnline) {
+    if (this.syncInProgress) {
       return;
     }
 
     this.syncInProgress = true;
-    console.log('Processing sync queue...');
+    console.log('Processing local sync queue...');
 
     try {
       const operations = await syncQueueService.getPendingOperations();
       
       for (const operation of operations) {
         try {
-          await this.processOperation(operation);
+          // Since we don't have a backend, we'll just mark operations as processed
+          // In a real implementation, you might sync with a different service
           await syncQueueService.markProcessed(operation.id);
-          console.log(`Processed operation ${operation.id}`);
+          console.log(`Processed local operation ${operation.id}`);
         } catch (error) {
           console.error(`Failed to process operation ${operation.id}:`, error);
           
@@ -115,50 +89,22 @@ class SyncService {
     }
   }
 
-  // Process individual operation
+  // Process individual operation (local only now)
   async processOperation(operation) {
     const { operation: opType, table, data } = operation;
 
-    switch (opType) {
-      case 'CREATE':
-        await this.apiRequest(`/${table}`, {
-          method: 'POST',
-          body: JSON.stringify(data)
-        });
-        break;
-
-      case 'UPDATE':
-        await this.apiRequest(`/${table}/${data.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(data)
-        });
-        break;
-
-      case 'DELETE':
-        await this.apiRequest(`/${table}/${data.id}`, {
-          method: 'DELETE'
-        });
-        break;
-
-      default:
-        throw new Error(`Unknown operation type: ${opType}`);
-    }
+    // Since we don't have a backend, we'll just log the operation
+    // In a real implementation, you might sync with a different service
+    console.log(`Local operation: ${opType} on ${table}`, data);
+    
+    // For now, we'll just return success
+    return { success: true };
   }
 
-  // Sync data from server to local
+  // Sync data from server to local (disabled - no backend)
   async syncFromServer(table, endpoint) {
-    if (!this.isOnline) {
-      console.log('Offline, skipping server sync');
-      return;
-    }
-
-    try {
-      const data = await this.apiRequest(endpoint);
-      await this.updateLocalData(table, data);
-      console.log(`Synced ${table} from server`);
-    } catch (error) {
-      console.error(`Failed to sync ${table} from server:`, error);
-    }
+    console.log(`Server sync disabled for ${table} - no backend available`);
+    // Since we don't have a backend, this method is now a no-op
   }
 
   // Update local data
@@ -224,31 +170,15 @@ class SyncService {
     }
   }
 
-  // Create with sync
+  // Create with sync (local only now)
   async createWithSync(table, data) {
     try {
-      // Create locally first
+      // Create locally only
       const { db } = await import('../db/database');
       const tableRef = db.table(table);
       const result = await tableRef.add(data);
 
-      // Try to sync immediately if online
-      if (this.isOnline) {
-        try {
-          await this.apiRequest(`/${table}`, {
-            method: 'POST',
-            body: JSON.stringify(data)
-          });
-          console.log(`Immediate sync successful for ${table}`);
-        } catch (error) {
-          // If immediate sync fails, queue it
-          await this.queueOperation('CREATE', table, data);
-        }
-      } else {
-        // Queue for later sync
-        await this.queueOperation('CREATE', table, data);
-      }
-
+      console.log(`Created ${table} locally (no backend sync)`);
       return result;
     } catch (error) {
       console.error(`Failed to create ${table}:`, error);
@@ -256,59 +186,30 @@ class SyncService {
     }
   }
 
-  // Update with sync
+  // Update with sync (local only now)
   async updateWithSync(table, id, data) {
     try {
-      // Update locally first
+      // Update locally only
       const { db } = await import('../db/database');
       const tableRef = db.table(table);
       await tableRef.update(id, data);
 
-      // Try to sync immediately if online
-      if (this.isOnline) {
-        try {
-          await this.apiRequest(`/${table}/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(data)
-          });
-          console.log(`Immediate sync successful for ${table}`);
-        } catch (error) {
-          // If immediate sync fails, queue it
-          await this.queueOperation('UPDATE', table, { id, ...data });
-        }
-      } else {
-        // Queue for later sync
-        await this.queueOperation('UPDATE', table, { id, ...data });
-      }
+      console.log(`Updated ${table} locally (no backend sync)`);
     } catch (error) {
       console.error(`Failed to update ${table}:`, error);
       throw error;
     }
   }
 
-  // Delete with sync
+  // Delete with sync (local only now)
   async deleteWithSync(table, id) {
     try {
-      // Delete locally first
+      // Delete locally only
       const { db } = await import('../db/database');
       const tableRef = db.table(table);
       await tableRef.delete(id);
 
-      // Try to sync immediately if online
-      if (this.isOnline) {
-        try {
-          await this.apiRequest(`/${table}/${id}`, {
-            method: 'DELETE'
-          });
-          console.log(`Immediate sync successful for ${table}`);
-        } catch (error) {
-          // If immediate sync fails, queue it
-          await this.queueOperation('DELETE', table, { id });
-        }
-      } else {
-        // Queue for later sync
-        await this.queueOperation('DELETE', table, { id });
-      }
+      console.log(`Deleted ${table} locally (no backend sync)`);
     } catch (error) {
       console.error(`Failed to delete ${table}:`, error);
       throw error;

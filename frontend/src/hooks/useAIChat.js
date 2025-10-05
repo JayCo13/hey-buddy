@@ -21,30 +21,13 @@ export const useAIChat = () => {
       setIsProcessing(true);
 
       try {
-        // For now, we'll use a mock response until we set up the backend API
-        // This will be replaced with actual API call to hey-buddy backend
-        const apiUrl = window.location.hostname === 'localhost' 
-          ? "http://localhost:8001/api/v1/chat" 
-          : "https://your-backend-url.com/api/v1/chat";
-        
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ message: content.trim() }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to get AI response");
-        }
-
+        // Since we don't have a backend, we'll use mock responses
+        // In a real implementation, you might integrate with an AI service
+        const mockResponse = getMockResponse(content.trim());
         const aiMessage = {
           id: `ai-${Date.now()}`,
           type: "ai",
-          content: data.response || "Sorry, I could not process your request.",
+          content: mockResponse,
           timestamp: new Date(),
         };
 

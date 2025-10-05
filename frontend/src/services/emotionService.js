@@ -2,8 +2,6 @@ class EmotionService {
   constructor() {
     this.isInitialized = false;
     this.initializationPromise = null;
-    this.apiBaseUrl = process.env.REACT_APP_API_URL || 
-      (window.location.hostname === 'localhost' ? 'http://localhost:8001/api/v1' : 'https://your-backend-url.com/api/v1');
   }
 
   async initialize() {
@@ -15,31 +13,19 @@ class EmotionService {
       return this.initializationPromise;
     }
 
-    this.initializationPromise = this._initializeBackend();
+    this.initializationPromise = this._initializeLocal();
     await this.initializationPromise;
     this.isInitialized = true;
   }
 
-  async _initializeBackend() {
+  async _initializeLocal() {
     try {
-      console.log('Initializing emotion recognition backend...');
-      
-      // Initialize the backend model
-      const response = await fetch(`${this.apiBaseUrl}/emotion/test/initialize-model`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`Backend initialization failed: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Emotion recognition backend initialized successfully:', result.message);
+      console.log('Initializing local emotion recognition...');
+      // Since we're working without a backend, we'll use mock emotion detection
+      // In a real implementation, you might use a client-side ML model
+      console.log('Local emotion recognition initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize emotion recognition backend:', error);
+      console.error('Failed to initialize local emotion recognition:', error);
       throw error;
     }
   }
@@ -52,39 +38,24 @@ class EmotionService {
 
       console.log('Analyzing emotion from audio...');
       
-      // Convert audio to WAV format if needed
-      const wavBlob = await this.convertToWav(audioBlob);
-      
-      // Send audio to backend for analysis
-      const formData = new FormData();
-      formData.append('audio_file', wavBlob, 'audio.wav');
-      
-      const response = await fetch(`${this.apiBaseUrl}/emotion/test/analyze-audio`, {
-        method: 'POST',
-        body: formData
-      });
+      // Since we don't have a backend, we'll simulate emotion analysis
+      // In a real implementation, you might use a client-side ML model
+      const mockEmotions = ['happy', 'neutral', 'calm', 'sad', 'surprised'];
+      const dominantEmotion = mockEmotions[Math.floor(Math.random() * mockEmotions.length)];
+      const confidence = Math.random() * 0.5 + 0.5; // Random confidence between 0.5 and 1.0
 
-      if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.statusText}`);
-      }
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Analysis failed');
-      }
-
-      const data = result.data || {};
-      const dominantEmotion = data.dominant_emotion || data.dominantEmotion || 'neutral';
-      const confidence = typeof data.confidence === 'number' ? data.confidence : 0;
-
-      // Normalize keys for UI consumption (camelCase expected by components)
       const normalized = {
-        ...data,
         dominantEmotion,
         confidence,
-        emotionColor: data.emotion_color || data.emotionColor || this.getEmotionColor(dominantEmotion),
-        emotionEmoji: data.emotion_emoji || data.emotionEmoji || this.getEmotionEmoji(dominantEmotion)
+        emotionColor: this.getEmotionColor(dominantEmotion),
+        emotionEmoji: this.getEmotionEmoji(dominantEmotion),
+        emotions: {
+          [dominantEmotion]: confidence,
+          neutral: 1 - confidence
+        }
       };
 
       return normalized;
