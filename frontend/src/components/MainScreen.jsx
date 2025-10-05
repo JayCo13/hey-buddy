@@ -48,33 +48,27 @@ const MainScreen = ({ onNavigate }) => {
     }
   };
 
-  // Enable speech on first user interaction with optimized flow
+  // Enable speech on first user interaction with improved timing
   const enableSpeech = useCallback(async () => {
     if (!speechEnabled) {
-      console.log('Speech initialization starting...');
-      
-      // First enable speech capabilities
       setSpeechEnabled(true);
       console.log('Speech enabled by user interaction');
       
-      // Add a small delay before greeting on mobile to ensure smooth transition
+      // Add a small delay before triggering greeting on mobile
       if (useFallbackMode && !greetingInitialized) {
-        // Show preparing state first
-        setVoiceActivationState('initializing');
+        // Wait for any audio initialization to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Wait for any pending operations to complete
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        console.log('🎤 Mobile: Triggering greeting after initialization');
+        console.log('🎤 Mobile: Triggering greeting after audio init');
         try {
           await triggerGreetingSpeech();
-          console.log('Greeting completed successfully');
         } catch (error) {
-          console.warn('Greeting failed, but continuing with voice activation:', error);
+          console.warn('Greeting speech failed:', error);
+          // Continue with app initialization even if greeting fails
         }
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -125,56 +119,31 @@ const MainScreen = ({ onNavigate }) => {
     checkMicrophonePermission();
   }, []);
 
-  // Auto-enable speech on first user interaction with smooth initialization
+  // Auto-enable speech on first user interaction (optimized)
   useEffect(() => {
     let hasTriggered = false;
-    let initializationTimer = null;
     
-    const handleUserInteraction = async () => {
-      if (!hasTriggered && !speechEnabled) {
+    const handleUserInteraction = () => {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
         hasTriggered = true;
-        console.log('User interaction detected, starting smooth initialization...');
-        
-        // Start with a brief delay to ensure UI is responsive
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Initialize in sequence
-        if (currentGreeting && greetingInitialized) {
-          console.log('Greeting ready, enabling speech...');
-          enableSpeech();
-        } else {
-          // Wait for greeting to be ready
-          initializationTimer = setInterval(() => {
-            if (currentGreeting && greetingInitialized) {
-              console.log('Greeting now ready, enabling speech...');
-              clearInterval(initializationTimer);
-              enableSpeech();
-            }
-          }, 200);
-        }
+        console.log('User interaction detected, enabling speech automatically...');
+        enableSpeech();
       }
     };
 
-    // Use a single, more specific event listener with passive option for better performance
+    // Use a single, more specific event listener
     const events = ['click', 'keydown', 'touchstart'];
     
     events.forEach(event => {
       document.addEventListener(event, handleUserInteraction, { once: true, passive: true });
     });
 
-    // Gentler fallback timer
-    const autoEnableTimer = setTimeout(async () => {
-      if (!hasTriggered && !speechEnabled) {
+    // Fallback timer with longer delay to reduce aggressive triggering
+    const autoEnableTimer = setTimeout(() => {
+      if (!hasTriggered && !speechEnabled && currentGreeting && greetingInitialized) {
         hasTriggered = true;
-        console.log('Starting smooth auto-initialization...');
-        
-        // Ensure UI is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (currentGreeting && greetingInitialized) {
-          console.log('Auto-enabling speech features...');
-          enableSpeech();
-        }
+        console.log('Attempting auto-enable speech...');
+        enableSpeech();
       }
     }, 3000);
 
@@ -182,12 +151,9 @@ const MainScreen = ({ onNavigate }) => {
       events.forEach(event => {
         document.removeEventListener(event, handleUserInteraction);
       });
-      if (initializationTimer) {
-        clearInterval(initializationTimer);
-      }
       clearTimeout(autoEnableTimer);
     };
-  }, [speechEnabled, currentGreeting, greetingInitialized, enableSpeech]);
+  }, [speechEnabled, currentGreeting, greetingInitialized]);
 
 
   const generateWaveform = () => {
@@ -241,9 +207,9 @@ const MainScreen = ({ onNavigate }) => {
             {/* Main Greeting */}
             <div className="text-center space-y-6">
               <div className="flex items-center justify-center space-x-3">
-                {/* Modern Hand Wave Icon */}
-                <h1 className="text-3xl font-light text-white/90 tracking-wide">
-                  {currentGreeting?.text || '👋🏻 Hey Jayden'}
+                {/* Dynamic AI Greeting with Emoji */}
+                <h1 className="text-3xl font-light text-white/90 tracking-wide opacity-0 animate-fadeIn">
+                  {currentGreeting.emoji} {currentGreeting.text}
                 </h1>
               </div>
               
@@ -303,35 +269,41 @@ const MainScreen = ({ onNavigate }) => {
             
           </div>
         ) : (
-          <div className="text-center space-y-6">
+          <div className="text-center space-y-6 animate-slideUp">
             <div className="flex items-center justify-center space-x-3">
-              {/* Modern Hand Wave Icon - Loading State */}
+              {/* Smooth Loading Animation */}
               <div className="relative group">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.5 12C19.43 12 21 10.43 21 8.5S19.43 5 17.5 5C16.74 5 16.06 5.33 15.58 5.85L14.5 7H13.5L12.5 5.5C12.22 5.19 11.85 5 11.5 5H10.5L9.5 6.5C9.22 6.81 8.85 7 8.5 7H7.5L6.42 5.85C5.94 5.33 5.26 5 4.5 5C2.57 5 1 6.57 1 8.5S2.57 12 4.5 12H17.5Z"/>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center shadow-lg transition-all duration-500 animate-pulse">
+                  <svg className="w-6 h-6 text-white animate-spin-slow" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 </div>
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse shadow-md"></div>
               </div>
               
-              <h1 className="text-3xl font-light text-white/90 tracking-wide">
-                Hello Jayden
+              <h1 className="text-3xl font-light text-white/90 tracking-wide animate-fadeIn">
+                Preparing your greeting...
               </h1>
             </div>
             
-            {/* Modern Loading Indicator */}
-            <div className="flex justify-center">
-              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 backdrop-blur-sm">
+            {/* Smooth Loading States */}
+            <div className="flex flex-col items-center space-y-4 transition-all duration-500">
+              <div className="inline-flex items-center px-4 py-2 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 backdrop-blur-sm transform transition-all duration-500 hover:scale-105">
                 <div className="w-2 h-2 bg-gradient-to-r from-blue-400 to-purple-400 rounded-full animate-pulse mr-3"></div>
-                <span className="text-sm font-medium text-blue-300">Preparing your greeting</span>
+                <span className="text-sm font-medium text-blue-300">Initializing AI greeting...</span>
               </div>
-            </div>
-            
-            <div className="flex justify-center">
-              <div className="inline-flex items-center space-x-2 text-sm text-gray-400">
-                <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
-                <span>Analyzing context</span>
+              
+              <div className="flex space-x-2">
+                {[...Array(3)].map((_, i) => (
+                  <div 
+                    key={i}
+                    className="w-2 h-2 bg-blue-400 rounded-full"
+                    style={{
+                      animation: `pulse 1.5s ease-in-out ${i * 0.2}s infinite`
+                    }}
+                  ></div>
+                ))}
               </div>
             </div>
           </div>
