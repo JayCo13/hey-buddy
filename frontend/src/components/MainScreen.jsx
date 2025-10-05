@@ -21,12 +21,9 @@ const MainScreen = ({ onNavigate }) => {
     greetingInitialized,
     triggerGreetingSpeech,
     useFallbackMode,
-    // New state variables
-    isSpeaking,
+    // Simplified state variables
     voiceActivationReady,
-    speechInProgress,
     voiceActivationState,
-    microphoneFullyReady,
     audioSystemReady
   } = useVoiceActivation();
 
@@ -382,9 +379,7 @@ const MainScreen = ({ onNavigate }) => {
                         ? 'Mobile-optimized voice mode • Loading audio system...'
                         : !audioSystemReady
                         ? 'Mobile-optimized voice mode • Preparing audio system...'
-                        : speechEnabled 
-                        ? 'Mobile-optimized voice mode • Ready'
-                        : 'Tap anywhere to enable voice features'
+                        : 'Mobile-optimized voice mode • Ready'
                       }
                     </p>
                   </div>
