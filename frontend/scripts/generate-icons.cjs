@@ -1,17 +1,6 @@
-#!/usr/bin/env node
-
-/**
- * Icon Generation Script for Hey Buddy PWA
- * This script generates various icon sizes needed for PWA
- * 
- * Note: This is a placeholder script. In production, you would use
- * tools like ImageMagick, Sharp, or online generators to create
- * actual icon files from a source image.
- */
-
 const fs = require('fs');
 const path = require('path');
-const Jimp = require('jimp');
+const { PNG } = require('pngjs');
 
 const iconSizes = [
   { size: 16, name: 'icon-16x16.png' },
@@ -38,28 +27,6 @@ const splashSizes = [
   { width: 2048, height: 2732, name: 'splash-2048x2732.png' }
 ];
 
-function generateIconManifest() {
-  const icons = iconSizes.map(icon => ({
-    src: `icons/${icon.name}`,
-    sizes: `${icon.size}x${icon.size}`,
-    type: 'image/png',
-    purpose: icon.size >= 192 ? 'any maskable' : 'any'
-  }));
-
-  return icons;
-}
-
-function generateSplashManifest() {
-  const splashScreens = splashSizes.map(splash => ({
-    src: `splash/${splash.name}`,
-    sizes: `${splash.width}x${splash.height}`,
-    type: 'image/png',
-    form_factor: splash.width < 1000 ? 'narrow' : 'wide'
-  }));
-
-  return splashScreens;
-}
-
 function createDirectories() {
   const publicDir = path.join(__dirname, '..', 'public');
   const iconsDir = path.join(publicDir, 'icons');
@@ -74,40 +41,72 @@ function createDirectories() {
   }
 }
 
+function generateIconManifest() {
+  return iconSizes.map(icon => ({
+    src: `icons/${icon.name}`,
+    sizes: `${icon.size}x${icon.size}`,
+    type: 'image/png',
+    purpose: icon.size >= 192 ? 'any maskable' : 'any'
+  }));
+}
+
+function generateSplashManifest() {
+  return splashSizes.map(splash => ({
+    src: `splash/${splash.name}`,
+    sizes: `${splash.width}x${splash.height}`,
+    type: 'image/png',
+    form_factor: splash.width < 1000 ? 'narrow' : 'wide'
+  }));
+}
+
+function createPNG(width, height) {
+  const png = new PNG({ width, height });
+  
+  // Create a gradient background
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (width * y + x) << 2;
+      
+      // Calculate distance from center for gradient
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+      const maxDistance = Math.sqrt(Math.pow(width / 2, 2) + Math.pow(height / 2, 2));
+      const gradient = 1 - (distance / maxDistance);
+      
+      // Set color (blue gradient)
+      png.data[idx] = Math.round(0 * gradient);   // R
+      png.data[idx + 1] = Math.round(122 * gradient); // G
+      png.data[idx + 2] = Math.round(255 * gradient); // B
+      png.data[idx + 3] = 255; // Alpha
+    }
+  }
+  
+  return png;
+}
+
 async function generateIconFiles() {
   const publicDir = path.join(__dirname, '..', 'public');
-  // Use the logo animation data to create a base image
-  const logoData = require('../src/logo.json');
-  const baseImage = await new Jimp(512, 512, '#000000');
-  
-  // Draw logo (you'll need to adjust this based on your logo.json structure)
-  // For now, we'll create a simple placeholder
-  baseImage.scan(0, 0, baseImage.bitmap.width, baseImage.bitmap.height, function(x, y, idx) {
-    // Add your logo drawing logic here
-    // This is just a placeholder that creates a gradient
-    const distance = Math.sqrt(Math.pow(x - 256, 2) + Math.pow(y - 256, 2));
-    const alpha = Math.max(0, Math.min(255, 255 - distance));
-    baseImage.bitmap.data[idx + 3] = alpha;
-  });
-  
-  // Save the base logo
-  await baseImage.writeAsync(path.join(publicDir, 'app-logo.png'));
   
   // Generate icons
   for (const icon of iconSizes) {
     const filePath = path.join(publicDir, 'icons', icon.name);
-    const clone = baseImage.clone();
-    await clone.resize(icon.size, icon.size, Jimp.RESIZE_BICUBIC)
-               .writeAsync(filePath);
+    const png = createPNG(icon.size, icon.size);
+    
+    // Save the PNG
+    const buffer = PNG.sync.write(png);
+    fs.writeFileSync(filePath, buffer);
     console.log(`✅ Generated ${icon.name}`);
   }
 
   // Generate splash screens
   for (const splash of splashSizes) {
     const filePath = path.join(publicDir, 'splash', splash.name);
-    const clone = baseImage.clone();
-    await clone.resize(splash.width, splash.height, Jimp.RESIZE_BICUBIC)
-               .writeAsync(filePath);
+    const png = createPNG(splash.width, splash.height);
+    
+    // Save the PNG
+    const buffer = PNG.sync.write(png);
+    fs.writeFileSync(filePath, buffer);
     console.log(`✅ Generated ${splash.name}`);
   }
 }
