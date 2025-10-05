@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Mic, Play, Pause, Home, User, Volume2, VolumeX, ArrowLeft, Settings, AudioWaveform } from 'lucide-react';
+import { Mic, Play, Pause, Home, User, Volume2, VolumeX, ArrowLeft, Settings, AudioWaveform, Heart } from 'lucide-react';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import { useAIChat } from '../hooks/useAIChat';
+import useEmotionRecognition from '../hooks/useEmotionRecognition';
+import EmotionDisplay from './EmotionDisplay';
 import Threads from '../effects/Threads';
 import ShinyText from '../effects/ShinyText';
 
@@ -12,13 +14,23 @@ const RecordScreen = ({ onNavigate }) => {
   const [currentTranscript, setCurrentTranscript] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
+  const [showEmotionPanel, setShowEmotionPanel] = useState(false);
   
   const recordingIntervalRef = useRef(null);
   const lastSpokenIdRef = useRef(null);
   const transcriptTimeoutRef = useRef(null);
 
-  // Initialize AI chat and speech recognition
+  // Initialize AI chat, speech recognition, and emotion recognition
   const { messages, isProcessing, sendMessage, clearMessages } = useAIChat();
+  const { 
+    currentEmotion, 
+    emotionHistory, 
+    isAnalyzing: isAnalyzingEmotion, 
+    analyzeEmotion, 
+    startEmotionMonitoring, 
+    stopEmotionMonitoring,
+    clearEmotionHistory 
+  } = useEmotionRecognition();
   
   // Debounced transcript update to prevent rapid re-renders
   const debouncedSetTranscript = useCallback((text, isFinal) => {
@@ -115,6 +127,7 @@ const RecordScreen = ({ onNavigate }) => {
     if (isListening) {
       // Stop recording
       stopListening();
+      stopEmotionMonitoring();
       setIsRecording(false);
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
@@ -140,6 +153,9 @@ const RecordScreen = ({ onNavigate }) => {
         // Start listening
         startListening({ continuousOverride: false });
         setIsRecording(true);
+        
+        // Start emotion monitoring
+        await startEmotionMonitoring();
         
         // Start recording timer
         setRecordingTime(0);
@@ -222,9 +238,21 @@ const RecordScreen = ({ onNavigate }) => {
           speed={3}
         />
         
-        <button className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors">
-          <Settings className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => setShowEmotionPanel(!showEmotionPanel)}
+            className={`w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors ${
+              showEmotionPanel 
+                ? 'bg-red-500/50 hover:bg-red-600/50' 
+                : 'bg-gray-800/50 hover:bg-gray-700/50'
+            }`}
+          >
+            <Heart className="w-5 h-5 text-white" />
+          </button>
+          <button className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors">
+            <Settings className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
 
       {/* Timer Display */}
@@ -236,6 +264,18 @@ const RecordScreen = ({ onNavigate }) => {
 
       {/* Main Content Area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 mt-18">
+        {/* Emotion Panel */}
+        {showEmotionPanel && (
+          <div className="w-full max-w-md mb-8">
+            <EmotionDisplay 
+              currentEmotion={currentEmotion}
+              emotionHistory={emotionHistory}
+              isAnalyzing={isAnalyzingEmotion}
+              showHistory={true}
+              showStats={true}
+            />
+          </div>
+        )}
         {/* Greeting with Transcript */}
         <div className="text-center mb-16 w-full max-w-md">
           {/* Live Transcription in greeting area */}
@@ -270,7 +310,15 @@ const RecordScreen = ({ onNavigate }) => {
         )}
 
         {/* Recording Control Button */}
-        <div className="text-center">
+        <div className="text-center relative">
+          {/* Emotion Indicator */}
+          {currentEmotion && isListening && (
+            <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center text-sm border-2 border-white/20"
+                 style={{ backgroundColor: `${currentEmotion.emotionColor}40` }}>
+              {currentEmotion.emotionEmoji}
+            </div>
+          )}
+          
           <button
             onClick={handleStartRecording}
             disabled={!isSupported}
@@ -310,6 +358,14 @@ const RecordScreen = ({ onNavigate }) => {
                 >
                   Clear
                 </button>
+                {emotionHistory.length > 0 && (
+                  <button
+                    onClick={clearEmotionHistory}
+                    className="px-3 py-1 bg-red-700/50 hover:bg-red-600/50 backdrop-blur-sm rounded-lg text-sm transition-colors border border-red-500/20"
+                  >
+                    Clear Emotions
+                  </button>
+                )}
               </div>
             </div>
             <div className="space-y-3 max-h-64 overflow-y-auto">

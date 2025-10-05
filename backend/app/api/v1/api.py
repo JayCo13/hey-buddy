@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import users, auth, notes, tasks, schedules, chat
+from app.api.v1.endpoints import users, auth, notes, tasks, schedules, chat, emotion
 
 api_router = APIRouter()
 
@@ -10,3 +10,4 @@ api_router.include_router(notes.router, prefix="/notes", tags=["notes"])
 api_router.include_router(tasks.router, prefix="/tasks", tags=["tasks"])
 api_router.include_router(schedules.router, prefix="/schedules", tags=["schedules"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+api_router.include_router(emotion.router, prefix="/emotion", tags=["emotion-recognition"])
