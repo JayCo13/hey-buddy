@@ -17,11 +17,6 @@ class GreetingService {
     this.fallbackGreetings = this.initializeFallbackGreetings();
     this.userPreferences = this.loadUserPreferences();
     this.interactionHistory = this.loadInteractionHistory();
-    
-    // Web Speech API properties
-    this.webSpeechAvailable = false;
-    this.availableVoices = [];
-    this.selectedVoice = null;
   }
 
   /**
@@ -34,9 +29,6 @@ class GreetingService {
       
       // Load cached greetings first
       this.loadCachedGreetings();
-      
-      // Initialize Web Speech API for mobile TTS
-      this.initializeWebSpeechAPI();
       
       // Start background AI initialization (non-blocking)
       this.startBackgroundAIInitialization();
@@ -87,68 +79,6 @@ class GreetingService {
       console.log('Saved greetings to cache');
     } catch (error) {
       console.warn('Failed to save greetings to cache:', error);
-    }
-  }
-
-  /**
-   * Initialize Web Speech API for mobile TTS
-   */
-  initializeWebSpeechAPI() {
-    try {
-      // Check if Web Speech API is available
-      if ('speechSynthesis' in window) {
-        console.log('Web Speech API available for TTS');
-        this.webSpeechAvailable = true;
-        
-        // Get available voices
-        this.availableVoices = speechSynthesis.getVoices();
-        
-        // Listen for voice changes
-        speechSynthesis.onvoiceschanged = () => {
-          this.availableVoices = speechSynthesis.getVoices();
-          console.log('Voice list updated:', this.availableVoices.length);
-        };
-        
-        // Select best voice for mobile
-        this.selectBestVoice();
-      } else {
-        console.warn('Web Speech API not available');
-        this.webSpeechAvailable = false;
-      }
-    } catch (error) {
-      console.warn('Failed to initialize Web Speech API:', error);
-      this.webSpeechAvailable = false;
-    }
-  }
-
-  /**
-   * Select the best voice for mobile TTS
-   */
-  selectBestVoice() {
-    if (!this.availableVoices || this.availableVoices.length === 0) {
-      this.selectedVoice = null;
-      return;
-    }
-
-    // Prefer native English voices for better mobile compatibility
-    const preferredVoices = this.availableVoices.filter(voice => 
-      voice.lang.startsWith('en') && 
-      (voice.name.includes('Samantha') || 
-       voice.name.includes('Alex') || 
-       voice.name.includes('Daniel') ||
-       voice.name.includes('Karen') ||
-       voice.name.includes('Google') ||
-       voice.name.includes('Microsoft'))
-    );
-
-    if (preferredVoices.length > 0) {
-      this.selectedVoice = preferredVoices[0];
-      console.log('Selected voice for mobile TTS:', this.selectedVoice.name);
-    } else {
-      // Fallback to any English voice
-      const englishVoices = this.availableVoices.filter(voice => voice.lang.startsWith('en'));
-      this.selectedVoice = englishVoices.length > 0 ? englishVoices[0] : this.availableVoices[0];
-      console.log('Using fallback voice:', this.selectedVoice?.name);
     }
   }
 
@@ -1125,78 +1055,6 @@ class GreetingService {
    */
   resetSessionGreeting() {
     this.sessionGreeting = null;
-  }
-
-  /**
-   * Speak greeting using Web Speech API (mobile-optimized)
-   * @param {Object} greeting - Greeting object with text
-   * @returns {Promise<boolean>} - True if speech started successfully
-   */
-  async speakGreeting(greeting) {
-    if (!this.webSpeechAvailable || !greeting || !greeting.text) {
-      console.warn('Cannot speak greeting: Web Speech API not available or no greeting text');
-      return false;
-    }
-
-    try {
-      // Cancel any existing speech
-      speechSynthesis.cancel();
-
-      // Create utterance with mobile-optimized settings
-      const utterance = new SpeechSynthesisUtterance(greeting.text);
-      
-      // Mobile-optimized settings
-      utterance.rate = 0.9; // Slightly slower for clarity on mobile
-      utterance.pitch = 1.0;
-      utterance.volume = 0.8; // Lower volume to avoid distortion
-      
-      // Use selected voice if available
-      if (this.selectedVoice) {
-        utterance.voice = this.selectedVoice;
-      }
-
-      // Set up event handlers
-      utterance.onstart = () => {
-        console.log('🎤 Greeting speech started via Web Speech API');
-      };
-
-      utterance.onend = () => {
-        console.log('🎤 Greeting speech completed via Web Speech API');
-      };
-
-      utterance.onerror = (event) => {
-        console.warn('🎤 Greeting speech error:', event.error);
-      };
-
-      // Speak the greeting
-      speechSynthesis.speak(utterance);
-      
-      return true;
-    } catch (error) {
-      console.error('Failed to speak greeting via Web Speech API:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Check if Web Speech API is ready for mobile TTS
-   * @returns {boolean} - True if ready
-   */
-  isWebSpeechReady() {
-    return this.webSpeechAvailable && this.availableVoices && this.availableVoices.length > 0;
-  }
-
-  /**
-   * Get Web Speech API status
-   * @returns {Object} - Status information
-   */
-  getWebSpeechStatus() {
-    return {
-      available: this.webSpeechAvailable,
-      voicesCount: this.availableVoices ? this.availableVoices.length : 0,
-      selectedVoice: this.selectedVoice ? this.selectedVoice.name : null,
-      ready: this.isWebSpeechReady()
-    };
   }
 }
 

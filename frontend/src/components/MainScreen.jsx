@@ -4,12 +4,6 @@ import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
-import mobileGreetingTest from '../utils/mobileGreetingTest';
-
-// Make test available globally for debugging
-if (typeof window !== 'undefined') {
-  window.mobileGreetingTest = mobileGreetingTest;
-}
 
 const MainScreen = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState('home');
@@ -63,10 +57,13 @@ const MainScreen = ({ onNavigate }) => {
       // Only trigger greeting on mobile if it hasn't been played yet
       if (useFallbackMode && !greetingInitialized) {
         console.log('🎤 Mobile: Triggering greeting after user interaction');
-        await triggerGreetingSpeech();
+        // Small delay to ensure TTS is ready
+        setTimeout(() => {
+          triggerGreetingSpeech();
+        }, 100);
       }
     }
-  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized, voiceActivationReady, voiceActivationState]);
+  }, [speechEnabled, triggerGreetingSpeech, useFallbackMode, greetingInitialized]);
 
   // Handle any user interaction to enable mobile TTS
   useEffect(() => {
@@ -372,22 +369,9 @@ const MainScreen = ({ onNavigate }) => {
                         ? 'Mobile-optimized voice mode • Hands-free listening active'
                         : speechEnabled 
                         ? 'Mobile-optimized voice mode • Ready'
+                        : !greetingInitialized
+                        ? 'Tap anywhere to hear your personalized greeting'
                         : 'Tap anywhere to enable voice features'
-                      }
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Greeting Context Information */}
-              {currentGreeting?.context && (
-                <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <p className="text-green-400 text-xs">
-                      {currentGreeting.generatedBy === 'AI' 
-                        ? `AI-generated ${currentGreeting.timeOfDay} greeting`
-                        : `Fallback ${currentGreeting.timeOfDay} greeting`
                       }
                     </p>
                   </div>
