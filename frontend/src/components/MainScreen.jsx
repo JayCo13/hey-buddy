@@ -4,6 +4,12 @@ import { useVoiceActivation } from '../contexts/VoiceActivationContext';
 import { Star, Bell, Mic, MessageCircle, User, ChevronRight, Play, Pause, Home, AlertCircle } from 'lucide-react';
 import Lottie from 'lottie-react';
 import logoData from '../logo.json';
+import mobileGreetingTest from '../utils/mobileGreetingTest';
+
+// Make test available globally for debugging
+if (typeof window !== 'undefined') {
+  window.mobileGreetingTest = mobileGreetingTest;
+}
 
 const MainScreen = ({ onNavigate }) => {
   const [activeTab, setActiveTab] = useState('home');
@@ -199,9 +205,9 @@ const MainScreen = ({ onNavigate }) => {
             {/* Main Greeting */}
             <div className="text-center space-y-6">
               <div className="flex items-center justify-center space-x-3">
-                {/* Modern Hand Wave Icon */}
+                {/* Dynamic AI-Generated Greeting */}
                 <h1 className="text-3xl font-light text-white/90 tracking-wide">
-                👋🏻 Hey Jayden
+                  {currentGreeting?.emoji || '👋🏻'} {currentGreeting?.text || 'Hey Jayden'}
                 </h1>
               </div>
               
@@ -367,6 +373,21 @@ const MainScreen = ({ onNavigate }) => {
                         : speechEnabled 
                         ? 'Mobile-optimized voice mode • Ready'
                         : 'Tap anywhere to enable voice features'
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Greeting Context Information */}
+              {currentGreeting?.context && (
+                <div className="mb-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <p className="text-green-400 text-xs">
+                      {currentGreeting.generatedBy === 'AI' 
+                        ? `AI-generated ${currentGreeting.timeOfDay} greeting`
+                        : `Fallback ${currentGreeting.timeOfDay} greeting`
                       }
                     </p>
                   </div>

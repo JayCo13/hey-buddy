@@ -89,87 +89,71 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       // Completely pause voice activation during TTS
       await pauseVoiceActivationCompletely();
       
-      // Use TTS to speak the greeting
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(greetingText);
-        utterance.rate = 1.0; // Faster rate for smoother experience
-        utterance.pitch = 1.0;
-        utterance.volume = 0.9; // Higher volume for clarity
+      // Use Web Speech API for mobile-optimized greeting
+      if (useFallbackMode && greetingService.isWebSpeechReady()) {
+        console.log('🎤 Using Web Speech API for mobile greeting...');
         
-        utterance.onstart = () => {
-          console.log('🎤 TTS started');
-        };
+        const success = await greetingService.speakGreeting(greetingObj);
         
-        utterance.onend = () => {
-          console.log('🎤 Greeting speech completed');
-          setIsSpeaking(false);
-          setSpeechInProgress(false);
-          
-          // Wait a bit before resuming voice activation
-          setTimeout(async () => {
-            console.log('🎤 Resuming voice activation after greeting...');
-            await resumeVoiceActivation();
-            setVoiceActivationState('ready');
+        if (success) {
+          // Set up completion handler
+          const handleSpeechEnd = () => {
+            console.log('🎤 Mobile greeting speech completed');
+            setIsSpeaking(false);
+            setSpeechInProgress(false);
             
-            // Auto-start hands-free listening after greeting
-            setTimeout(() => {
-              console.log('🎤 Auto-starting hands-free listening...');
-              startListening();
-            }, 500); // Shorter delay for smoother experience
-          }, 300); // Brief pause to ensure TTS is completely finished
-        };
-        
-        utterance.onerror = (event) => {
-          console.error('🎤 TTS Error:', event.error);
-          setIsSpeaking(false);
-          setSpeechInProgress(false);
-          
-          // Resume voice activation even if TTS fails
-          setTimeout(async () => {
-            console.log('🎤 Resuming voice activation after TTS error...');
-            await resumeVoiceActivation();
-            setVoiceActivationState('ready');
+            // Wait a bit before resuming voice activation
+            setTimeout(async () => {
+              console.log('🎤 Resuming voice activation after mobile greeting...');
+              await resumeVoiceActivation();
+              setVoiceActivationState('ready');
+              
+              // Auto-start hands-free listening after greeting
+              setTimeout(() => {
+                console.log('🎤 Auto-starting hands-free listening...');
+                startListening();
+              }, 500);
+            }, 300);
             
-            // Start listening after error recovery
-            setTimeout(() => {
-              console.log('🎤 Starting listening after TTS error recovery...');
-              startListening();
-            }, 500);
-          }, 300);
-        };
-        
-        // Try to speak, but don't fail if it doesn't work on mobile
-        try {
-          speechSynthesis.speak(utterance);
-        } catch (ttsError) {
-          console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
-          setIsSpeaking(false);
-          setSpeechInProgress(false);
+            // Remove the event listener
+            speechSynthesis.removeEventListener('end', handleSpeechEnd);
+          };
           
-          // Resume voice activation even if TTS fails
-          setTimeout(async () => {
-            console.log('🎤 Resuming voice activation after TTS failure...');
-            await resumeVoiceActivation();
-            setVoiceActivationState('ready');
+          speechSynthesis.addEventListener('end', handleSpeechEnd);
+          
+          // Set up error handler
+          const handleSpeechError = (event) => {
+            console.warn('🎤 Mobile greeting speech error:', event.error);
+            setIsSpeaking(false);
+            setSpeechInProgress(false);
             
-            // Start listening after failure recovery
-            setTimeout(() => {
-              console.log('🎤 Starting listening after TTS failure recovery...');
-              startListening();
-            }, 500);
-          }, 300);
+            // Resume voice activation even if TTS fails
+            setTimeout(async () => {
+              console.log('🎤 Resuming voice activation after mobile TTS error...');
+              await resumeVoiceActivation();
+              setVoiceActivationState('ready');
+              
+              // Start listening after error recovery
+              setTimeout(() => {
+                console.log('🎤 Starting listening after mobile TTS error recovery...');
+                startListening();
+              }, 500);
+            }, 300);
+            
+            // Remove the event listener
+            speechSynthesis.removeEventListener('error', handleSpeechError);
+          };
+          
+          speechSynthesis.addEventListener('error', handleSpeechError);
+        } else {
+          // Fallback to regular TTS if Web Speech API fails
+          console.log('🎤 Web Speech API failed, falling back to regular TTS...');
+          fallbackToRegularTTS(greetingText);
         }
       } else {
-        console.warn('🎤 Speech synthesis not available');
-        setIsSpeaking(false);
-        setSpeechInProgress(false);
-        setVoiceActivationState('ready');
-        
-        // Start listening immediately if no TTS
-        setTimeout(() => {
-          console.log('🎤 Starting listening (no TTS)...');
-          startListening();
-        }, 500);
+        // Use regular TTS for desktop or when Web Speech API is not ready
+        console.log('🎤 Using regular TTS for greeting...');
+        fallbackToRegularTTS(greetingText);
       }
     } catch (err) {
       console.error('Failed to trigger greeting speech:', err);
@@ -179,6 +163,91 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       setError(`Greeting failed: ${err.message}`);
     }
   }, [useFallbackMode, voiceActivationState, speechInProgress]);
+
+  // Fallback to regular TTS
+  const fallbackToRegularTTS = useCallback((greetingText) => {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(greetingText);
+      utterance.rate = 1.0; // Faster rate for smoother experience
+      utterance.pitch = 1.0;
+      utterance.volume = 0.9; // Higher volume for clarity
+      
+      utterance.onstart = () => {
+        console.log('🎤 Regular TTS started');
+      };
+      
+      utterance.onend = () => {
+        console.log('🎤 Greeting speech completed');
+        setIsSpeaking(false);
+        setSpeechInProgress(false);
+        
+        // Wait a bit before resuming voice activation
+        setTimeout(async () => {
+          console.log('🎤 Resuming voice activation after greeting...');
+          await resumeVoiceActivation();
+          setVoiceActivationState('ready');
+          
+          // Auto-start hands-free listening after greeting
+          setTimeout(() => {
+            console.log('🎤 Auto-starting hands-free listening...');
+            startListening();
+          }, 500); // Shorter delay for smoother experience
+        }, 300); // Brief pause to ensure TTS is completely finished
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('🎤 TTS Error:', event.error);
+        setIsSpeaking(false);
+        setSpeechInProgress(false);
+        
+        // Resume voice activation even if TTS fails
+        setTimeout(async () => {
+          console.log('🎤 Resuming voice activation after TTS error...');
+          await resumeVoiceActivation();
+          setVoiceActivationState('ready');
+          
+          // Start listening after error recovery
+          setTimeout(() => {
+            console.log('🎤 Starting listening after TTS error recovery...');
+            startListening();
+          }, 500);
+        }, 300);
+      };
+      
+      // Try to speak, but don't fail if it doesn't work on mobile
+      try {
+        speechSynthesis.speak(utterance);
+      } catch (ttsError) {
+        console.warn('🎤 TTS failed (likely mobile restriction):', ttsError);
+        setIsSpeaking(false);
+        setSpeechInProgress(false);
+        
+        // Resume voice activation even if TTS fails
+        setTimeout(async () => {
+          console.log('🎤 Resuming voice activation after TTS failure...');
+          await resumeVoiceActivation();
+          setVoiceActivationState('ready');
+          
+          // Start listening after failure recovery
+          setTimeout(() => {
+            console.log('🎤 Starting listening after TTS failure recovery...');
+            startListening();
+          }, 500);
+        }, 300);
+      }
+    } else {
+      console.warn('🎤 Speech synthesis not available');
+      setIsSpeaking(false);
+      setSpeechInProgress(false);
+      setVoiceActivationState('ready');
+      
+      // Start listening immediately if no TTS
+      setTimeout(() => {
+        console.log('🎤 Starting listening (no TTS)...');
+        startListening();
+      }, 500);
+    }
+  }, []);
 
   // Completely pause voice activation during TTS
   const pauseVoiceActivationCompletely = useCallback(async () => {
@@ -317,9 +386,13 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       
-      // Don't show "aborted" errors as they're normal during navigation
-      if (event.error !== 'aborted') {
+      // Only show critical errors, ignore common non-critical ones
+      const nonCriticalErrors = ['aborted', 'network', 'audio-capture'];
+      
+      if (!nonCriticalErrors.includes(event.error)) {
         setError(`Speech recognition error: ${event.error}`);
+      } else {
+        console.warn('Non-critical speech recognition error (not shown to user):', event.error);
       }
       
       setIsListening(false);
@@ -481,7 +554,27 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
 
     voiceActivationService.setErrorCallback((error) => {
       console.error('Voice activation error:', error);
-      setError(error);
+      
+      // Only show critical errors, ignore non-critical ones
+      const criticalErrors = [
+        'not-allowed',
+        'service-not-allowed', 
+        'no available backend',
+        'Out of memory',
+        'Failed to initialize',
+        'Failed to start'
+      ];
+      
+      const isCriticalError = criticalErrors.some(criticalError => 
+        error.toLowerCase().includes(criticalError.toLowerCase())
+      );
+      
+      if (isCriticalError) {
+        setError(error);
+      } else {
+        // Log non-critical errors but don't show them to user
+        console.warn('Non-critical voice activation error (not shown to user):', error);
+      }
     });
 
     voiceActivationService.setStatusCallback((status) => {

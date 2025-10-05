@@ -26,6 +26,14 @@ class ServiceWorkerManager {
         });
       });
 
+      // Listen for force refresh messages from service worker
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'FORCE_REFRESH') {
+          console.log('Service Worker: Force refresh requested');
+          window.location.reload();
+        }
+      });
+
       return true;
     } catch (error) {
       console.error('Service Worker registration failed:', error);
