@@ -11,7 +11,9 @@ const MainScreen = ({ onNavigate }) => {
   const [showProfile, setShowProfile] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(false);
   
+  // Voice activation context
   const {
+    isListening,
     audioLevel,
     error,
     isInitialized,
@@ -19,6 +21,10 @@ const MainScreen = ({ onNavigate }) => {
     greetingInitialized,
     triggerGreetingSpeech,
     useFallbackMode,
+    // New state variables
+    isSpeaking,
+    voiceActivationReady,
+    speechInProgress,
     voiceActivationState
   } = useVoiceActivation();
 

@@ -178,7 +178,7 @@ export const VoiceActivationProvider = ({ children, onNavigateToRecord }) => {
       setVoiceActivationState('error');
       setError(`Greeting failed: ${err.message}`);
     }
-  }, [useFallbackMode, voiceActivationState, speechInProgress, pauseVoiceActivationCompletely, resumeVoiceActivation, startListening]);
+  }, [useFallbackMode, voiceActivationState, speechInProgress]);
 
   // Completely pause voice activation during TTS
   const pauseVoiceActivationCompletely = useCallback(async () => {
