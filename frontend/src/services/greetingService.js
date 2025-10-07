@@ -784,7 +784,6 @@ class GreetingService {
    */
   getContextualInfo(now, isWeekend) {
     const hour = now.getHours();
-    const dayOfWeek = now.getDay();
     
     let context = {
       suggestions: [],
@@ -951,7 +950,7 @@ class GreetingService {
    * @returns {string} - Follow-up question
    */
   generateFollowUpQuestion(greeting) {
-    const { timeOfDay, mood, context } = greeting;
+    const { timeOfDay } = greeting;
     
     const questions = {
       morning: [

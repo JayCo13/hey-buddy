@@ -4,8 +4,13 @@ import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import { useAIChat } from '../hooks/useAIChat';
 import useEmotionRecognition from '../hooks/useEmotionRecognition';
 import EmotionDisplay from './EmotionDisplay';
+import EmotionImageDisplay from './EmotionImageDisplay';
 import Threads from '../effects/Threads';
 import ShinyText from '../effects/ShinyText';
+import ProactiveNotification from './ProactiveNotification';
+import StatusManager from './StatusManager';
+import proactiveService from '../services/proactiveService';
+import profileService from '../services/profileService';
 
 const RecordScreen = ({ onNavigate }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -15,48 +20,28 @@ const RecordScreen = ({ onNavigate }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [showEmotionPanel, setShowEmotionPanel] = useState(false);
+  const [showStatusManager, setShowStatusManager] = useState(false);
+  const [proactiveData, setProactiveData] = useState(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   
   const recordingIntervalRef = useRef(null);
   const lastSpokenIdRef = useRef(null);
   const transcriptTimeoutRef = useRef(null);
 
   // Initialize AI chat, speech recognition, and emotion recognition
-  const { messages, isProcessing, sendMessage, clearMessages } = useAIChat();
+  const { messages, isProcessing, sendMessage, clearMessages, error: chatError } = useAIChat();
   const { 
     currentEmotion, 
     emotionHistory, 
     isAnalyzing: isAnalyzingEmotion, 
-    analyzeEmotion, 
     startEmotionMonitoring, 
     stopEmotionMonitoring,
     clearEmotionHistory 
   } = useEmotionRecognition();
   
-  // Debounced transcript update to prevent rapid re-renders
-  const debouncedSetTranscript = useCallback((text, isFinal) => {
-    if (transcriptTimeoutRef.current) {
-      clearTimeout(transcriptTimeoutRef.current);
-    }
-    
-    if (isFinal) {
-      setCurrentTranscript(text);
-      if (text.trim()) {
-        // Auto-send after a brief pause when speech is final
-        setTimeout(() => {
-          handleSendMessage(text);
-        }, 500);
-      }
-    } else {
-      // Debounce interim results to reduce flashing
-      transcriptTimeoutRef.current = setTimeout(() => {
-        setCurrentTranscript(text);
-      }, 100);
-    }
-  }, []);
-
+  // Initialize speech recognition first to get resetTranscript
   const { 
     isListening, 
-    transcript, 
     isSupported: speechSupported, 
     startListening, 
     stopListening, 
@@ -65,7 +50,28 @@ const RecordScreen = ({ onNavigate }) => {
     continuous: true,
     interimResults: true,
     lang: "en-US",
-    onResult: debouncedSetTranscript,
+    onResult: (text, isFinal) => {
+      if (transcriptTimeoutRef.current) {
+        clearTimeout(transcriptTimeoutRef.current);
+      }
+      
+      if (isFinal) {
+        setCurrentTranscript(text);
+        if (text.trim()) {
+          // Auto-send after a brief pause when speech is final
+          setTimeout(() => {
+            sendMessage(text.trim());
+            setCurrentTranscript("");
+            resetTranscript();
+          }, 500);
+        }
+      } else {
+        // Debounce interim results to reduce flashing
+        transcriptTimeoutRef.current = setTimeout(() => {
+          setCurrentTranscript(text);
+        }, 100);
+      }
+    },
     onError: (error) => {
       console.error("Speech recognition error:", error);
       alert(`Speech recognition error: ${error}`);
@@ -77,6 +83,16 @@ const RecordScreen = ({ onNavigate }) => {
       }
     },
   });
+  
+  // Handle sending messages - now resetTranscript is already defined
+  const handleSendMessage = useCallback((message) => {
+    const textToSend = message || currentTranscript;
+    if (textToSend.trim()) {
+      sendMessage(textToSend.trim());
+      setCurrentTranscript("");
+      resetTranscript();
+    }
+  }, [currentTranscript, sendMessage, resetTranscript]);
 
   // Update supported state
   useEffect(() => {
@@ -92,6 +108,30 @@ const RecordScreen = ({ onNavigate }) => {
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
       }
+    };
+  }, []);
+
+  // Online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Proactive notifications: start monitoring and handle callbacks
+  useEffect(() => {
+    proactiveService.setOnProactiveMessageCallback((data) => {
+      setProactiveData(data);
+    });
+    // Faster checks during development; adjust interval if needed
+    proactiveService.startMonitoring(5 * 60 * 1000);
+    return () => {
+      proactiveService.stopMonitoring();
     };
   }, []);
 
@@ -167,16 +207,7 @@ const RecordScreen = ({ onNavigate }) => {
         alert("Cannot access microphone. Please allow microphone permission in your browser.");
       }
     }
-  }, [isSupported, isListening, stopListening, resetTranscript, startListening]);
-
-  const handleSendMessage = (message) => {
-    const textToSend = message || currentTranscript;
-    if (textToSend.trim()) {
-      sendMessage(textToSend.trim());
-      setCurrentTranscript("");
-      resetTranscript();
-    }
-  };
+  }, [isSupported, isListening, stopListening, stopEmotionMonitoring, resetTranscript, startListening, startEmotionMonitoring]);
 
   const stopSpeaking = () => {
     if ("speechSynthesis" in window) {
@@ -208,10 +239,35 @@ const RecordScreen = ({ onNavigate }) => {
     onNavigate(tabId);
   };
 
+  const handleProactiveRespond = async (message) => {
+    if (message) {
+      await sendMessage(message);
+      profileService.logInteraction('message');
+    }
+    setProactiveData(null);
+  };
+
+  const handleStatusApplied = (status, quietMinutes) => {
+    // Soft gate proactive when DND
+    if (status === 'do_not_disturb') {
+      proactiveService.setEnabled(false);
+    } else {
+      proactiveService.setEnabled(true);
+    }
+  };
 
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white relative overflow-hidden">
+      {/* Proactive Notification */}
+      {proactiveData?.should_send && proactiveData?.message && (
+        <ProactiveNotification 
+          message={proactiveData.message}
+          context={proactiveData.context}
+          onClose={() => setProactiveData(null)}
+          onRespond={handleProactiveRespond}
+        />
+      )}
       {/* Threads Background */}
       <div className="absolute inset-0">
         {useMemo(() => (
@@ -227,6 +283,7 @@ const RecordScreen = ({ onNavigate }) => {
       <div className="relative z-10 flex items-center justify-between px-6 py-4 pt-12 main-content-safe">
         <button 
           onClick={() => onNavigate('home')}
+          aria-label="Go back"
           className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-white" />
@@ -241,6 +298,8 @@ const RecordScreen = ({ onNavigate }) => {
         <div className="flex items-center space-x-2">
           <button 
             onClick={() => setShowEmotionPanel(!showEmotionPanel)}
+            aria-pressed={showEmotionPanel}
+            aria-label="Toggle emotion panel"
             className={`w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors ${
               showEmotionPanel 
                 ? 'bg-red-500/50 hover:bg-red-600/50' 
@@ -249,9 +308,31 @@ const RecordScreen = ({ onNavigate }) => {
           >
             <Heart className="w-5 h-5 text-white" />
           </button>
-          <button className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors">
+          <button 
+            onClick={() => setShowStatusManager(true)}
+            aria-label="Open status manager"
+            className="w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur-sm flex items-center justify-center hover:bg-gray-700/50 transition-colors"
+          >
             <Settings className="w-5 h-5 text-white" />
           </button>
+        </div>
+      </div>
+
+      {/* Status Row */}
+      <div className="relative z-10 px-6 -mt-2" role="status" aria-live="polite">
+        <div className="flex items-center justify-center space-x-4 text-xs text-gray-300">
+          <div className="flex items-center space-x-2">
+            <span className={`inline-block w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></span>
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className={`inline-block w-2 h-2 rounded-full ${isListening ? 'bg-blue-400' : 'bg-gray-500'}`}></span>
+            <span>{isListening ? 'Listening' : 'Idle'}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className={`inline-block w-2 h-2 rounded-full ${isAnalyzingEmotion ? 'bg-amber-400' : 'bg-gray-500'}`}></span>
+            <span>Emotion {isAnalyzingEmotion ? 'Analyzing' : 'Ready'}</span>
+          </div>
         </div>
       </div>
 
@@ -261,6 +342,15 @@ const RecordScreen = ({ onNavigate }) => {
           {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
         </div>
       </div>
+
+      {/* Error Banner */}
+      {chatError && (
+        <div className="relative z-10 w-full max-w-md mx-auto mt-4">
+          <div className="bg-red-900/40 border border-red-500/40 text-red-100 rounded-xl px-4 py-3 backdrop-blur-sm">
+            <div className="text-sm">{chatError}</div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 mt-18">
@@ -274,6 +364,16 @@ const RecordScreen = ({ onNavigate }) => {
               showHistory={true}
               showStats={true}
             />
+            {currentEmotion && (
+              <div className="mt-4">
+                <EmotionImageDisplay 
+                  emotion={currentEmotion.dominantEmotion}
+                  context={messages[messages.length - 1]?.content || ''}
+                  style="photorealistic"
+                  autoGenerate={true}
+                />
+              </div>
+            )}
           </div>
         )}
         {/* Greeting with Transcript */}
@@ -297,12 +397,31 @@ const RecordScreen = ({ onNavigate }) => {
           </div>
         </div>
 
+        {/* Emotion Chip - clearer status than tiny icon on button */}
+        {currentEmotion && (
+          <div className="mb-6 flex justify-center">
+            <div 
+              className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full border backdrop-blur-sm ${isAnalyzingEmotion ? 'animate-pulse' : ''}`}
+              style={{ borderColor: '#ffffff22', backgroundColor: `${currentEmotion.emotionColor}22` }}
+            >
+              <span className="text-lg">{currentEmotion.emotionEmoji}</span>
+              <span 
+                className="text-sm font-medium capitalize"
+                style={{ color: currentEmotion.emotionColor }}
+              >
+                {currentEmotion.dominantEmotion}
+              </span>
+              <span className="text-xs text-gray-200/80">{Math.round(currentEmotion.confidence * 100)}%</span>
+            </div>
+          </div>
+        )}
+
         {/* Processing Indicator */}
         {isProcessing && (
-          <div className="mb-8 w-full max-w-md">
+          <div className="mb-8 w-full max-w-md" role="status" aria-live="polite">
             <div className="bg-blue-900/30 backdrop-blur-sm rounded-xl p-4 border border-blue-500/20">
               <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
+                <div className="motion-safe:animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400"></div>
                 <span className="text-blue-100">AI is thinking...</span>
               </div>
             </div>
@@ -322,6 +441,7 @@ const RecordScreen = ({ onNavigate }) => {
           <button
             onClick={handleStartRecording}
             disabled={!isSupported}
+            aria-label={isListening ? 'Stop recording' : 'Start recording'}
             className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-105 ${
               isListening 
                 ? 'bg-gray-700/80 hover:bg-gray-600/80 backdrop-blur-sm border border-white/20' 
@@ -347,6 +467,7 @@ const RecordScreen = ({ onNavigate }) => {
                 {isSpeaking && (
                   <button
                     onClick={stopSpeaking}
+                    aria-label="Stop speaking"
                     className="w-8 h-8 bg-red-600/80 hover:bg-red-700/80 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors"
                   >
                     <VolumeX className="w-4 h-4 text-white" />
@@ -354,6 +475,7 @@ const RecordScreen = ({ onNavigate }) => {
                 )}
                 <button
                   onClick={clearMessages}
+                  aria-label="Clear conversation"
                   className="px-3 py-1 bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm rounded-lg text-sm transition-colors border border-white/10"
                 >
                   Clear
@@ -361,6 +483,7 @@ const RecordScreen = ({ onNavigate }) => {
                 {emotionHistory.length > 0 && (
                   <button
                     onClick={clearEmotionHistory}
+                    aria-label="Clear emotion history"
                     className="px-3 py-1 bg-red-700/50 hover:bg-red-600/50 backdrop-blur-sm rounded-lg text-sm transition-colors border border-red-500/20"
                   >
                     Clear Emotions
@@ -385,6 +508,7 @@ const RecordScreen = ({ onNavigate }) => {
                     {message.type === 'ai' && (
                       <button
                         onClick={() => speakMessage(message.content)}
+                        aria-label="Speak this message"
                         className="w-8 h-8 bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ml-2 border border-white/10"
                       >
                         <Volume2 className="w-4 h-4 text-gray-300" />
@@ -421,6 +545,14 @@ const RecordScreen = ({ onNavigate }) => {
           ))}
         </div>
       </div>
+
+      {/* Status Manager Modal */}
+      {showStatusManager && (
+        <StatusManager 
+          onClose={() => setShowStatusManager(false)}
+          onStatusChange={handleStatusApplied}
+        />
+      )}
     </div>
   );
 };

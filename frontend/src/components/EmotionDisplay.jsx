@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Clock, BarChart3 } from 'lucide-react';
+import { Clock, BarChart3 } from 'lucide-react';
 
 const EmotionDisplay = ({ 
   currentEmotion, 

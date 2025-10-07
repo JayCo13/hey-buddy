@@ -5,12 +5,15 @@ import SplashScreen from './components/SplashScreen';
 import IntroPages from './components/IntroPages';
 import AppNavigator from './components/AppNavigator';
 import offlineSyncManager from './utils/offlineSync';
+import { useNotifications } from './hooks/useNotifications';
+import ProactiveNotification from './components/ProactiveNotification';
 
 function App() {
   const [dbReady, setDbReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const [showIntro, setShowIntro] = useState(false);
-  const [userId] = useState('1'); // Mock user ID for demo
+  const { lastEvent } = useNotifications();
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     // Initialize database
@@ -43,6 +46,16 @@ function App() {
     return () => clearTimeout(splashTimer);
   }, []);
 
+  useEffect(() => {
+    if (!lastEvent) return;
+    if (lastEvent.type === 'notification') {
+      setToast({
+        message: lastEvent.message || 'Action completed',
+        context: lastEvent.context || null
+      });
+    }
+  }, [lastEvent]);
+
   // Show splash screen
   if (showSplash) {
     return <SplashScreen />;
@@ -67,6 +80,14 @@ function App() {
   return (
     <>
       <AppNavigator />
+      {toast && (
+        <ProactiveNotification
+          message={toast.message}
+          context={toast.context}
+          onClose={() => setToast(null)}
+          onRespond={() => setToast(null)}
+        />
+      )}
     </>
   );
 }

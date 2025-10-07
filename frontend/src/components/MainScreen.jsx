@@ -13,7 +13,6 @@ const MainScreen = ({ onNavigate }) => {
   
   // Voice activation context
   const {
-    isListening,
     audioLevel,
     error,
     isInitialized,
@@ -21,10 +20,6 @@ const MainScreen = ({ onNavigate }) => {
     greetingInitialized,
     triggerGreetingSpeech,
     useFallbackMode,
-    // New state variables
-    isSpeaking,
-    voiceActivationReady,
-    speechInProgress,
     voiceActivationState
   } = useVoiceActivation();
 
@@ -153,7 +148,7 @@ const MainScreen = ({ onNavigate }) => {
       });
       clearTimeout(autoEnableTimer);
     };
-  }, [speechEnabled, currentGreeting, greetingInitialized]);
+  }, [speechEnabled, currentGreeting, greetingInitialized, enableSpeech]);
 
 
   const generateWaveform = () => {

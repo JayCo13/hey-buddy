@@ -4,8 +4,7 @@ import screen1Animation from '../screen1.json';
 import screen2Animation from '../screen2.json';
 import screen3Animation from '../screen3.json';
 import screen4Animation from '../screen4.json';
-import { CloudCheck, Smartphone, Sun, Calendar, ArrowRight, CheckCircle, Shield, Zap, Users, BarChart3, Brain, Cpu, Network, Sparkles } from 'lucide-react';
-import ShinyText from '../effects/ShinyText';
+import { ArrowRight } from 'lucide-react';
 import GradientText from '../effects/GradientText'
 
 const IntroPages = ({ onComplete }) => {
@@ -213,56 +212,6 @@ const IntroPages = ({ onComplete }) => {
 
   const skipIntro = () => {
     onComplete();
-  };
-
-  const getModernSolutionIcon = (iconType) => {
-    switch (iconType) {
-      case 'cloud-check':
-        return <CloudCheck size={20} className="text-current" />;
-      case 'user-interface':
-        return <Smartphone size={20} className="text-current" />;
-      case 'sunrise':
-        return <Sun size={20} className="text-current" />;
-      case 'calendar-simple':
-        return <Calendar size={20} className="text-current" />;
-      default:
-        return <div className="w-5 h-5 bg-blue-500 rounded-lg"></div>;
-    }
-  };
-
-  const getVisualElement = (visual) => {
-    switch (visual) {
-      case 'offline':
-        return (
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 border-2 border-white rounded-full"></div>
-          </div>
-        );
-      case 'voice':
-        return (
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 bg-white rounded-full"></div>
-          </div>
-        );
-      case 'energy':
-        return (
-          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
-          </div>
-        );
-      case 'schedule':
-        return (
-          <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 bg-white rounded-full"></div>
-          </div>
-        );
-      default:
-        return (
-          <div className="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-lg flex items-center justify-center">
-            <div className="w-4 h-4 bg-white rounded-full"></div>
-          </div>
-        );
-    }
   };
 
   return (
