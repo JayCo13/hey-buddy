@@ -81,17 +81,11 @@ const EmotionImageDisplay = ({ emotion, context = null, style = 'photorealistic'
   return (
     <div className="relative w-full group">
       <div className="relative w-full h-64 bg-gray-800 rounded-2xl overflow-hidden">
-        {imageUrl.startsWith('data:') ? (
-          <img
-            src={imageUrl}
-            alt={`${emotion} emotion`}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-            <p className="text-gray-400">Image loaded</p>
-          </div>
-        )}
+        <img
+          src={imageUrl}
+          alt={`${emotion} emotion`}
+          className="w-full h-full object-cover"
+        />
         
         {/* Overlay with emotion label */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">

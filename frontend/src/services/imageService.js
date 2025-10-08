@@ -25,7 +25,7 @@ class ImageService {
 
       console.log(`🎨 Generating emotion image for: ${emotion}`);
 
-      const response = await fetch(`${API_BASE_URL}/profile/image/emotion`, {
+      const response = await fetch(`${API_BASE_URL}/image/emotion`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -72,7 +72,7 @@ class ImageService {
 
       console.log(`🎨 Generating greeting image for: ${timeOfDay} / ${mood}`);
 
-      const response = await fetch(`${API_BASE_URL}/profile/image/greeting`, {
+      const response = await fetch(`${API_BASE_URL}/image/greeting`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -109,7 +109,7 @@ class ImageService {
    */
   async getAvailableModels() {
     try {
-      const response = await fetch(`${API_BASE_URL}/profile/image/models`, {
+      const response = await fetch(`${API_BASE_URL}/image/models`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json'

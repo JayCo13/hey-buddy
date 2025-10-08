@@ -184,6 +184,12 @@ const MainScreen = ({ onNavigate }) => {
         </div>
         
         <div className="flex items-center space-x-4">
+          <button
+            onClick={() => onNavigate('creativity')}
+            className="bg-blue-600/20 border border-blue-500/30 px-3 py-1 rounded-lg flex items-center space-x-1 hover:bg-blue-600/30 transition-colors"
+          >
+            <span className="text-sm font-medium text-blue-300">Unleash your creativity</span>
+          </button>
           <button className="bg-gray-800 px-3 py-1 rounded-lg flex items-center space-x-1">
             <Star className="w-4 h-4 text-blue-400" />
             <span className="text-sm font-medium">Premium</span>

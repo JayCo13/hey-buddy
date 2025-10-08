@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import MainScreen from './MainScreen';
 import RecordScreen from './RecordScreen';
 import ProfileScreen from './ProfileScreen';
+import CreativityScreen from './CreativityScreen';
 import LoadingScreen from './LoadingScreen';
 import { VoiceActivationProvider } from '../contexts/VoiceActivationContext';
 
@@ -53,6 +54,8 @@ const AppNavigator = () => {
         return <RecordScreen onNavigate={handleNavigation} />;
       case 'profile':
         return <ProfileScreen onNavigate={handleNavigation} />;
+      case 'creativity':
+        return <CreativityScreen onNavigate={handleNavigation} />;
       default:
         return <MainScreen onNavigate={handleNavigation} />;
     }
