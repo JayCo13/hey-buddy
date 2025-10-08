@@ -11,8 +11,9 @@ import ProactiveNotification from './ProactiveNotification';
 import StatusManager from './StatusManager';
 import proactiveService from '../services/proactiveService';
 import profileService from '../services/profileService';
+import TypingText from './TypingText';
 
-const RecordScreen = ({ onNavigate }) => {
+const RecordScreen = ({ onNavigate, autoPlayWakeWordResponse = false }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [activeTab, setActiveTab] = useState('record');
@@ -23,10 +24,18 @@ const RecordScreen = ({ onNavigate }) => {
   const [showStatusManager, setShowStatusManager] = useState(false);
   const [proactiveData, setProactiveData] = useState(null);
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [emotionMonitoringActive, setEmotionMonitoringActive] = useState(false);
+  const [showWakeWordResponse, setShowWakeWordResponse] = useState(false);
+  const [wakeWordResponseComplete, setWakeWordResponseComplete] = useState(false);
   
   const recordingIntervalRef = useRef(null);
   const lastSpokenIdRef = useRef(null);
   const transcriptTimeoutRef = useRef(null);
+  const hasPlayedWakeWordResponse = useRef(false);
+  const lastTypedMessageIdRef = useRef(null);
+  
+  // Hardcoded wake word response
+  const WAKE_WORD_RESPONSE = "Good morning. You have 6 meetings today. Two conflicts detected: your 2 PM with the Shanghai team overlaps with the board prep call. I've moved Shanghai to Thursday 9 AM their time—they've already confirmed. Your 10 AM needs the Q3 forecast. It's not in the shared folder. Should I follow up with finance, or would you like to handle it? The weather's clear for your 6 PM flight. Your driver's confirmed for 4:15 PM. That gives you a 30 minutes buffer. One priority: Jennifer from Accenture called twice yesterday. Marked urgent. I can dial her now, or add her to your 11 AM gap.";
 
   // Initialize AI chat, speech recognition, and emotion recognition
   const { messages, isProcessing, sendMessage, clearMessages, error: chatError } = useAIChat();
@@ -47,7 +56,7 @@ const RecordScreen = ({ onNavigate }) => {
     stopListening, 
     resetTranscript 
   } = useSpeechRecognition({
-    continuous: true,
+  continuous: false,
     interimResults: true,
     lang: "en-US",
     onResult: (text, isFinal) => {
@@ -65,6 +74,34 @@ const RecordScreen = ({ onNavigate }) => {
             resetTranscript();
           }, 500);
         }
+
+      // Stop listening and emotion monitoring after one utterance
+      try {
+        stopListening();
+      } catch (e) {
+        console.warn("Failed to stop listening:", e);
+      }
+
+      if (emotionMonitoringActive) {
+        try {
+          stopEmotionMonitoring();
+        } catch (e) {
+          console.warn("Failed to stop emotion monitoring:", e);
+        } finally {
+          setEmotionMonitoringActive(false);
+        }
+      }
+
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+
+      if (transcriptTimeoutRef.current) {
+        clearTimeout(transcriptTimeoutRef.current);
+        transcriptTimeoutRef.current = null;
+      }
       } else {
         // Debounce interim results to reduce flashing
         transcriptTimeoutRef.current = setTimeout(() => {
@@ -98,6 +135,36 @@ const RecordScreen = ({ onNavigate }) => {
   useEffect(() => {
     setIsSupported(speechSupported);
   }, [speechSupported]);
+
+  // Auto-play wake word response when entering the screen
+  useEffect(() => {
+    if (autoPlayWakeWordResponse && !hasPlayedWakeWordResponse.current) {
+      hasPlayedWakeWordResponse.current = true;
+      
+      // Small delay to let the screen render
+      setTimeout(() => {
+        setShowWakeWordResponse(true);
+        
+        // Speak the response using TTS
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(WAKE_WORD_RESPONSE);
+          utterance.rate = 0.95;
+          utterance.pitch = 1;
+          utterance.volume = 1;
+          
+          utterance.onstart = () => setIsSpeaking(true);
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            setWakeWordResponseComplete(true);
+          };
+          utterance.onerror = () => setIsSpeaking(false);
+          
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(utterance);
+        }
+      }, 500);
+    }
+  }, [autoPlayWakeWordResponse, WAKE_WORD_RESPONSE]);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -167,7 +234,18 @@ const RecordScreen = ({ onNavigate }) => {
     if (isListening) {
       // Stop recording
       stopListening();
-      stopEmotionMonitoring();
+
+      // Stop emotion monitoring only if it actually started
+      if (emotionMonitoringActive) {
+        try {
+          stopEmotionMonitoring();
+        } catch (e) {
+          console.warn("Failed to stop emotion monitoring:", e);
+        } finally {
+          setEmotionMonitoringActive(false);
+        }
+      }
+
       setIsRecording(false);
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
@@ -190,12 +268,18 @@ const RecordScreen = ({ onNavigate }) => {
         resetTranscript();
         setCurrentTranscript("");
         
-        // Start listening
+        // Start listening for a single utterance only
         startListening({ continuousOverride: false });
         setIsRecording(true);
         
-        // Start emotion monitoring
-        await startEmotionMonitoring();
+        // Try to start emotion monitoring; continue gracefully if it fails (e.g., Whisper not initialized)
+        try {
+          await startEmotionMonitoring();
+          setEmotionMonitoringActive(true);
+        } catch (err) {
+          console.warn("Emotion monitoring disabled (likely Whisper not initialized):", err);
+          setEmotionMonitoringActive(false);
+        }
         
         // Start recording timer
         setRecordingTime(0);
@@ -207,7 +291,16 @@ const RecordScreen = ({ onNavigate }) => {
         alert("Cannot access microphone. Please allow microphone permission in your browser.");
       }
     }
-  }, [isSupported, isListening, stopListening, stopEmotionMonitoring, resetTranscript, startListening, startEmotionMonitoring]);
+  }, [
+    isSupported,
+    isListening,
+    stopListening,
+    stopEmotionMonitoring,
+    resetTranscript,
+    startListening,
+    startEmotionMonitoring,
+    emotionMonitoringActive
+  ]);
 
   const stopSpeaking = () => {
     if ("speechSynthesis" in window) {
@@ -354,6 +447,82 @@ const RecordScreen = ({ onNavigate }) => {
 
       {/* Main Content Area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 mt-18">
+        {/* Wake Word Response - Displayed prominently */}
+        {showWakeWordResponse && (
+          <div className="w-full max-w-2xl mb-8 animate-slideUp">
+            <div className="bg-gradient-to-br from-blue-900/50 to-purple-900/50 backdrop-blur-lg rounded-2xl p-6 border border-blue-400/40 shadow-2xl relative overflow-hidden">
+              {/* Animated background glow */}
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-blue-500/10 animate-pulse"></div>
+              
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-center space-x-3 mb-5">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg animate-pulse">
+                    <AudioWaveform className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Buddy</h3>
+                    <p className="text-xs text-blue-300 flex items-center space-x-1">
+                      <span className="inline-block w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                      <span>Your AI Assistant</span>
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Divider */}
+                <div className="h-px bg-gradient-to-r from-transparent via-blue-400/50 to-transparent mb-4"></div>
+                
+                <div className="text-white text-base leading-relaxed">
+                  <TypingText 
+                    text={WAKE_WORD_RESPONSE}
+                    speed={20}
+                    onComplete={() => setWakeWordResponseComplete(true)}
+                    className="leading-relaxed"
+                    showCursor={!wakeWordResponseComplete}
+                  />
+                </div>
+                
+                {wakeWordResponseComplete && (
+                  <div className="mt-5 flex items-center justify-between pt-4 border-t border-white/10">
+                    <button
+                      onClick={() => {
+                        setShowWakeWordResponse(false);
+                        // Reset for next time
+                        setTimeout(() => {
+                          setWakeWordResponseComplete(false);
+                          hasPlayedWakeWordResponse.current = false;
+                        }, 500);
+                      }}
+                      className="text-sm text-blue-300 hover:text-blue-200 transition-all duration-200 hover:underline"
+                    >
+                      Dismiss
+                    </button>
+                    <button
+                      onClick={() => {
+                        if ('speechSynthesis' in window) {
+                          window.speechSynthesis.cancel();
+                          const utterance = new SpeechSynthesisUtterance(WAKE_WORD_RESPONSE);
+                          utterance.rate = 0.95;
+                          utterance.pitch = 1;
+                          utterance.volume = 1;
+                          utterance.onstart = () => setIsSpeaking(true);
+                          utterance.onend = () => setIsSpeaking(false);
+                          utterance.onerror = () => setIsSpeaking(false);
+                          window.speechSynthesis.speak(utterance);
+                        }
+                      }}
+                      className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-lg transition-all duration-200 transform hover:scale-105 shadow-lg"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                      <span className="text-sm font-medium">Replay</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {/* Emotion Panel */}
         {showEmotionPanel && (
           <div className="w-full max-w-md mb-8">
@@ -492,31 +661,57 @@ const RecordScreen = ({ onNavigate }) => {
               </div>
             </div>
             <div className="space-y-3 max-h-64 overflow-y-auto">
-              {messages.map((message) => (
-                <div key={message.id} className={`rounded-xl p-4 backdrop-blur-sm border ${
-                  message.type === 'user' 
-                    ? 'bg-blue-900/30 ml-8 border-blue-500/20' 
-                    : 'bg-gray-800/30 mr-8 border-white/10'
-                }`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <p className="text-white">{message.content}</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
+              {messages.map((message, index) => {
+                // Chỉ dùng typing animation cho AI message mới nhất
+                const isLatestAIMessage = message.type === 'ai' && 
+                  index === messages.length - 1 && 
+                  lastTypedMessageIdRef.current !== message.id;
+                
+                // Đánh dấu message đã được typed
+                if (isLatestAIMessage) {
+                  setTimeout(() => {
+                    lastTypedMessageIdRef.current = message.id;
+                  }, 0);
+                }
+
+                return (
+                  <div key={message.id} className={`rounded-xl p-4 backdrop-blur-sm border ${
+                    message.type === 'user' 
+                      ? 'bg-blue-900/30 ml-8 border-blue-500/20' 
+                      : 'bg-gray-800/30 mr-8 border-white/10'
+                  }`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        {/* Hiển thị với typing animation cho AI message mới nhất */}
+                        {message.type === 'ai' && isLatestAIMessage ? (
+                          <div className="text-white text-sm">
+                            <TypingText 
+                              text={message.content}
+                              speed={15}
+                              showCursor={true}
+                              className="text-sm leading-relaxed"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-white text-sm">{message.content}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1">
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                      {message.type === 'ai' && (
+                        <button
+                          onClick={() => speakMessage(message.content)}
+                          aria-label="Speak this message"
+                          className="w-8 h-8 bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ml-2 border border-white/10"
+                        >
+                          <Volume2 className="w-4 h-4 text-gray-300" />
+                        </button>
+                      )}
                     </div>
-                    {message.type === 'ai' && (
-                      <button
-                        onClick={() => speakMessage(message.content)}
-                        aria-label="Speak this message"
-                        className="w-8 h-8 bg-gray-700/50 hover:bg-gray-600/50 backdrop-blur-sm rounded-full flex items-center justify-center transition-colors ml-2 border border-white/10"
-                      >
-                        <Volume2 className="w-4 h-4 text-gray-300" />
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
